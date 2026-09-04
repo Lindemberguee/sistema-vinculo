@@ -9,7 +9,9 @@ export type Field =
   | (Base & { kind: "text" | "textarea" | "url" | "number" | "color" | "datetime" })
   | (Base & { kind: "checkbox" })
   | (Base & { kind: "select"; options: { value: string; label: string }[] })
+  | (Base & { kind: "multiSelect"; options: { value: string; label: string }[] })
   | (Base & { kind: "centsList" }) // reais list -> cents number[]
+  | (Base & { kind: "numberList" }) // whole numbers via comma list
   | (Base & { kind: "stringList" }) // string[] via newlines
   | (Base & { kind: "faqList" }) // [{q,a}]
   | (Base & { kind: "imageList" }) // [{url,alt}]
@@ -23,7 +25,12 @@ export const EDITOR_FIELDS: Record<BlockType, Field[]> = {
     { key: "title", label: "Título", kind: "text" },
     { key: "subtitle", label: "Subtítulo", kind: "textarea" },
     { key: "backgroundImageUrl", label: "Imagem de fundo", hint: "Cole a URL de uma imagem.", kind: "url" },
-    { key: "overlay", label: "Escurecer fundo", hint: "0 = nenhum, 1 = preto.", kind: "number" },
+    {
+      key: "overlay",
+      label: "Escurecer fundo",
+      hint: "0 = cor original; valores baixos recebem um mínimo para manter o texto legível.",
+      kind: "number",
+    },
     { key: "ctaLabel", label: "Texto do botão", kind: "text" },
     {
       key: "ctaTarget",
@@ -60,8 +67,26 @@ export const EDITOR_FIELDS: Record<BlockType, Field[]> = {
   amountOptions: [
     { key: "amountsCents", label: "Valores sugeridos", kind: "centsList" },
     { key: "allowCustom", label: "Permitir valor livre", kind: "checkbox" },
+    {
+      key: "defaultIndex",
+      label: "Valor selecionado por padrão",
+      hint: "Começa em 0 (primeiro valor).",
+      kind: "number",
+    },
   ],
   donationCheckout: [
+    {
+      key: "methods",
+      label: "Formas de pagamento",
+      hint: "Escolha pelo menos uma opção.",
+      kind: "multiSelect",
+      required: true,
+      options: [
+        { value: "PIX", label: "Pix" },
+        { value: "CREDIT_CARD", label: "Cartão de crédito" },
+        { value: "BOLETO", label: "Boleto" },
+      ],
+    },
     { key: "allowRecurring", label: "Permitir doação mensal", kind: "checkbox" },
     { key: "allowTip", label: "Permitir contribuição extra", kind: "checkbox" },
     { key: "tipLabel", label: "Texto da gorjeta", kind: "text" },
@@ -74,6 +99,7 @@ export const EDITOR_FIELDS: Record<BlockType, Field[]> = {
   ],
   raffleWidget: [
     { key: "raffleId", label: "ID da rifa", hint: "Copie da tela da rifa.", kind: "text", required: true },
+    { key: "quickAmounts", label: "Atalhos de quantidade", hint: "Números separados por vírgula.", kind: "numberList" },
     { key: "allowPickNumbers", label: "Permitir escolher números", kind: "checkbox" },
   ],
   eventTickets: [
@@ -87,6 +113,12 @@ export const EDITOR_FIELDS: Record<BlockType, Field[]> = {
   intlDonation: [
     { key: "title", label: "Título", kind: "text" },
     { key: "currencies", label: "Moedas", hint: "Uma por linha, ex.: USD.", kind: "stringList" },
+    {
+      key: "suggestedAmounts",
+      label: "Valores sugeridos",
+      hint: "Valores inteiros na moeda escolhida, separados por vírgula.",
+      kind: "numberList",
+    },
   ],
   progressBar: [
     { key: "showValues", label: "Mostrar valores", kind: "checkbox" },
@@ -109,12 +141,28 @@ export const EDITOR_FIELDS: Record<BlockType, Field[]> = {
         { value: "vimeo", label: "Vimeo" },
       ],
     },
-    { key: "videoId", label: "ID do vídeo", hint: "Ex.: dQw4w9WgXcQ (parte final da URL).", kind: "text", required: true },
+    {
+      key: "videoId",
+      label: "ID do vídeo",
+      hint: "Ex.: dQw4w9WgXcQ (parte final da URL).",
+      kind: "text",
+      required: true,
+    },
   ],
   cta: [
     { key: "title", label: "Título", kind: "text" },
     { key: "body", label: "Texto", kind: "textarea" },
     { key: "buttonLabel", label: "Texto do botão", kind: "text" },
+    {
+      key: "target",
+      label: "Ação do botão",
+      kind: "select",
+      options: [
+        { value: "checkout", label: "Ir para o checkout" },
+        { value: "url", label: "Abrir uma URL" },
+      ],
+    },
+    { key: "url", label: "URL do botão", hint: "Usada quando a ação é “Abrir uma URL”.", kind: "url" },
   ],
   donorWall: [
     { key: "limit", label: "Quantos doadores mostrar", hint: "De 3 a 100.", kind: "number" },

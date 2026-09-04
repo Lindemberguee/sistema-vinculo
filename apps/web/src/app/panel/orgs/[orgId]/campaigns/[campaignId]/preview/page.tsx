@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { safeParseBlocks } from "@donation/blocks";
 import { resolveOrgPublicKey, parsePlanLimits } from "@donation/db";
 import { requireOrgAccessPage } from "@/server/auth-helpers";
@@ -9,11 +11,7 @@ import type { RenderContext } from "@/blocks/context";
 export const dynamic = "force-dynamic";
 
 /** In-panel preview of the DRAFT blocks (page.blocks), not the published ones. */
-export default async function DraftPreview({
-  params,
-}: {
-  params: Promise<{ orgId: string; campaignId: string }>;
-}) {
+export default async function DraftPreview({ params }: { params: Promise<{ orgId: string; campaignId: string }> }) {
   const { orgId, campaignId } = await params;
   const { db } = await requireOrgAccessPage(orgId, "VIEWER");
 
@@ -101,14 +99,31 @@ export default async function DraftPreview({
   };
 
   return (
-    <div className="-mx-6 -my-8 lg:-mx-10">
-      <div className="bg-warn-bg px-4 py-2 text-center text-sm text-warn">
-        Pré-visualização do rascunho — não publicada.{" "}
+    <div className="-mx-4 -my-6 sm:-mx-6 lg:-mx-8">
+      <header className="sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-2 border-b border-line bg-surface/95 px-3 py-2 backdrop-blur sm:px-5">
+        <Link
+          href={`/orgs/${orgId}/campaigns/${campaignId}/editor`}
+          className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-sm font-medium text-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
+          <ArrowLeft className="size-4" aria-hidden />
+          <span className="hidden sm:inline">Voltar ao editor</span>
+          <span className="sm:hidden">Editor</span>
+        </Link>
+        <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{c.title}</h1>
+        <span className="inline-flex min-h-7 items-center rounded-full bg-warn-bg px-2.5 text-xs font-medium text-warn">
+          Rascunho
+        </span>
+        <Link href={`/orgs/${orgId}/campaigns/${campaignId}/editor`} className="btn-secondary btn-sm no-underline">
+          <Pencil className="size-3.5" aria-hidden /> Editar
+        </Link>
+      </header>
+      <div className="bg-warn-bg px-4 py-2 text-center text-xs text-warn sm:text-sm">
+        Esta é uma pré-visualização do rascunho. Nenhuma doação, inscrição ou lance será processado.{" "}
         {parsed.success ? "" : "⚠️ Há blocos inválidos que serão ignorados."}
       </div>
-      <main className="@container bg-surface">
+      <section aria-label="Pré-visualização da campanha" className="@container bg-surface">
         <BlockList blocks={blocks} ctx={ctx} />
-      </main>
+      </section>
     </div>
   );
 }

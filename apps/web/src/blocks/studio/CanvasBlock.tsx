@@ -4,6 +4,7 @@ import { memo, useMemo } from "react";
 import { Block, BLOCK_REGISTRY, type BlockType } from "@donation/blocks";
 import { renderStaticBlock, STATIC_TYPES, type StaticCtx } from "@/blocks/render-static";
 import { resolveEmbed } from "@/blocks/embed";
+import { cn } from "@/components/ui";
 import { BlockIcon } from "./block-icons";
 import type { EditorBlock } from "./studio-reducer";
 
@@ -90,6 +91,15 @@ function DataMock({ block, ctx }: { block: EditorBlock; ctx: StaticCtx }) {
               </span>
             ))}
           </div>
+          <div className="mt-3 flex flex-wrap gap-1.5 text-[0.6875rem] text-muted">
+            {(Array.isArray(p.methods) ? p.methods : []).map((method) => (
+              <span key={String(method)} className="rounded-full bg-canvas px-2 py-1">
+                {method === "CREDIT_CARD" ? "Cartão" : String(method)}
+              </span>
+            ))}
+            {p.allowRecurring === true && <span className="rounded-full bg-canvas px-2 py-1">Mensal</span>}
+            {p.allowTip === true && <span className="rounded-full bg-canvas px-2 py-1">Contribuição extra</span>}
+          </div>
           <div className="mt-3 space-y-2">
             <div className="h-9 rounded-md border border-line-strong bg-canvas" />
             <div className="h-9 rounded-md border border-line-strong bg-canvas" />
@@ -102,24 +112,34 @@ function DataMock({ block, ctx }: { block: EditorBlock; ctx: StaticCtx }) {
         </div>
       );
 
-    case "amountOptions":
+    case "amountOptions": {
+      const amounts = Array.isArray(p.amountsCents)
+        ? p.amountsCents.filter((c): c is number => typeof c === "number" && c > 0)
+        : [];
+      const defaultIndex = typeof p.defaultIndex === "number" ? p.defaultIndex : 0;
       return (
         <div className="mx-auto my-8 flex max-w-xl flex-wrap justify-center gap-2">
-          {[2000, 5000, 10000, 25000].map((c) => (
-            <span key={c} className={chip}>
-              R$ {c / 100}
+          {amounts.map((c, i) => (
+            <span
+              key={`${c}-${i}`}
+              className={cn(chip, i === defaultIndex && "border-brand-500 bg-brand-50 text-brand-700")}
+            >
+              R$ {(c / 100).toFixed(2).replace(".", ",")}
             </span>
           ))}
+          {p.allowCustom !== false && <span className={chip}>Outro valor</span>}
         </div>
       );
+    }
 
     case "sponseeGrid":
       return (
         <div className="mx-auto my-8 max-w-4xl px-6">
-          <div className="mb-4 text-lg font-semibold">
-            {String(p.title ?? "Escolha quem apadrinhar")}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="mb-4 text-lg font-semibold">{String(p.title ?? "Escolha quem apadrinhar")}</div>
+          <div
+            className="grid gap-4 sm:[grid-template-columns:repeat(var(--gcols),minmax(0,1fr))]"
+            style={{ ["--gcols" as string]: String(Math.min(Math.max(Number(p.columns) || 1, 1), 4)) }}
+          >
             {[0, 1, 2].map((i) => (
               <div key={i} className="overflow-hidden rounded-xl border border-line bg-surface">
                 <div className="h-28 bg-canvas" />
@@ -142,7 +162,7 @@ function DataMock({ block, ctx }: { block: EditorBlock; ctx: StaticCtx }) {
           <div className="text-sm font-semibold">Rifa</div>
           <p className="mt-1 text-xs text-muted">Escolha quantos números comprar.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {[1, 5, 10, 20].map((n) => (
+            {(Array.isArray(p.quickAmounts) ? p.quickAmounts : []).map((n) => (
               <span key={n} className={chip}>
                 {n}
               </span>
@@ -150,7 +170,7 @@ function DataMock({ block, ctx }: { block: EditorBlock; ctx: StaticCtx }) {
           </div>
           <div className="mt-4 flex justify-center">
             <span className={fauxBtn} style={{ background: ctx.accent }}>
-              Comprar números
+              {p.allowPickNumbers ? "Escolher números" : "Comprar números"}
             </span>
           </div>
         </div>
@@ -176,12 +196,18 @@ function DataMock({ block, ctx }: { block: EditorBlock; ctx: StaticCtx }) {
               Comprar
             </span>
           </div>
+          {p.askAttendeeNames === true && (
+            <p className="mt-2 text-center text-xs text-muted">Nomes dos participantes serão solicitados.</p>
+          )}
         </div>
       );
 
     case "auctionLots":
       return (
-        <div className="mx-auto my-8 grid max-w-4xl gap-4 px-6 sm:grid-cols-2">
+        <div
+          className="mx-auto my-8 grid max-w-4xl gap-4 px-6 sm:[grid-template-columns:repeat(var(--gcols),minmax(0,1fr))]"
+          style={{ ["--gcols" as string]: String(Math.min(Math.max(Number(p.columns) || 1, 1), 3)) }}
+        >
           {[0, 1].map((i) => (
             <div key={i} className="overflow-hidden rounded-xl border border-line bg-surface">
               <div className="h-32 bg-canvas" />
@@ -202,8 +228,17 @@ function DataMock({ block, ctx }: { block: EditorBlock; ctx: StaticCtx }) {
         <div className="mx-auto my-8 w-full max-w-[420px] rounded-xl border border-line bg-surface p-5 shadow-card">
           <div className="text-sm font-semibold">{String(p.title ?? "Donate from abroad")}</div>
           <div className="mt-3 flex gap-2">
-            <span className={`${chip} px-2`}>USD ▾</span>
+            <span className={`${chip} px-2`}>
+              {String((Array.isArray(p.currencies) && p.currencies[0]) || "USD")} ▾
+            </span>
             <div className="h-9 flex-1 rounded-md border border-line-strong bg-canvas" />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(Array.isArray(p.suggestedAmounts) ? p.suggestedAmounts : []).map((amount, index) => (
+              <span key={`${String(amount)}-${index}`} className={chip}>
+                {String(amount)}
+              </span>
+            ))}
           </div>
           <div className="mt-4 flex justify-center">
             <span className={fauxBtn} style={{ background: ctx.accent }}>
@@ -296,7 +331,10 @@ function DataMock({ block, ctx }: { block: EditorBlock; ctx: StaticCtx }) {
           <div className="font-semibold">Quem já apoiou</div>
           <div className="mt-3 flex flex-wrap gap-2">
             {["Ana", "Bruno", "Carla", "Diego", "Eva"].map((n) => (
-              <span key={n} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-1 pl-1 pr-3 text-sm">
+              <span
+                key={n}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-1 pl-1 pr-3 text-sm"
+              >
                 <span className="grid size-6 place-items-center rounded-full bg-canvas text-[0.625rem] font-semibold text-muted">
                   {n[0]}
                 </span>

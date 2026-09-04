@@ -28,9 +28,33 @@ describe("block schema", () => {
 
   it("rejects videoEmbed with an arbitrary src", () => {
     expect(
-      safeParseBlocks([{ id: "a", type: "videoEmbed", props: { provider: "youtube", videoId: "https://evil.example/x" } }])
+      safeParseBlocks([
+        { id: "a", type: "videoEmbed", props: { provider: "youtube", videoId: "https://evil.example/x" } },
+      ]).success,
+    ).toBe(false);
+  });
+
+  it("rejects an amount option default outside the configured list", () => {
+    expect(
+      safeParseBlocks([{ id: "amounts", type: "amountOptions", props: { amountsCents: [1000], defaultIndex: 2 } }])
         .success,
     ).toBe(false);
+  });
+
+  it("requires quick amounts and international suggested amounts", () => {
+    expect(
+      safeParseBlocks([{ id: "raffle", type: "raffleWidget", props: { raffleId: "r", quickAmounts: [] } }]).success,
+    ).toBe(false);
+    expect(safeParseBlocks([{ id: "intl", type: "intlDonation", props: { suggestedAmounts: [] } }]).success).toBe(
+      false,
+    );
+  });
+
+  it("requires a URL when a call-to-action targets an external URL", () => {
+    expect(safeParseBlocks([{ id: "cta", type: "cta", props: { title: "Apoie", target: "url" } }]).success).toBe(false);
+    expect(safeParseBlocks([{ id: "hero", type: "hero", props: { title: "Apoie", ctaTarget: "url" } }]).success).toBe(
+      false,
+    );
   });
 
   it("draft schema accepts every registry default block (incl. half-configured module blocks)", () => {
