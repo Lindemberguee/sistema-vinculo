@@ -259,7 +259,7 @@ export function RaffleWidget(props: RaffleWidgetProps) {
         </label>
       </div>
 
-      {error && <p className="field-error mt-2">{error}</p>}
+      {error && <p className="field-error mt-2" role="alert">{error}</p>}
 
       <button type="submit" disabled={busy} className="mt-3 w-full rounded-full py-3 text-[15px] font-medium text-white disabled:opacity-50" style={{ background: accent }}>
         {busy ? "Processando…" : `Comprar ${count} número${count === 1 ? "" : "s"} — ${brl(totalCents)}`}
