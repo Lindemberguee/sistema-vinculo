@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Prisma, prisma } from "@donation/db";
 import { isAppError } from "@donation/shared";
 import { requireOrgAccess, requireUser } from "@/server/auth-helpers";
+import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES, headObject } from "@/server/storage";
 
 export interface OnboardingResult {
   ok: boolean;
@@ -121,6 +122,16 @@ export async function registerKycDocument(
   try {
     const { db, userId } = await requireOrgAccess(organizationId, "ADMIN");
     const d = docSchema.parse(input);
+    const ext = ALLOWED_UPLOAD_TYPES[d.contentType];
+    if (!ext || d.sizeBytes > MAX_UPLOAD_BYTES) return { ok: false, error: "Arquivo inválido ou acima do limite de 10 MB." };
+    const expectedPrefix = `kyc/${organizationId}/${d.kind}/`;
+    if (!d.storageKey.startsWith(expectedPrefix) || !d.storageKey.endsWith(`.${ext}`)) {
+      return { ok: false, error: "Arquivo não pertence a esta organização ou tipo de documento." };
+    }
+    const uploaded = await headObject(d.storageKey);
+    if (!uploaded || uploaded.contentLength !== d.sizeBytes || uploaded.contentType !== d.contentType) {
+      return { ok: false, error: "O upload não foi encontrado ou os metadados não conferem." };
+    }
 
     // One current document per kind — replace any previous.
     await db.kycDocument.deleteMany({ where: { kind: d.kind } });

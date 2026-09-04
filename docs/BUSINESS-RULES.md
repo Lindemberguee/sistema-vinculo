@@ -202,10 +202,9 @@ ACTIVE -> PAST_DUE -> CANCELED
 
 Após três falhas, o plano é cancelado. No cartão, o código tenta cancelar no gateway; no Pix, o próprio worker cria QR codes mensais.
 
-Problemas observados:
+Pendências ainda abertas:
 
-- cancelamento no gateway pode falhar e ser ignorado; mesmo assim o plano local vira `CANCELED` e o usuário recebe confirmação;
-- uma cobrança posterior de cartão aceita plano cancelado e o reativa como `ACTIVE`;
+- retry/DLQ e estado explícito `CANCEL_PENDING` ainda não existem para indisponibilidade prolongada do gateway;
 - criação da recorrência ocorre antes de a operação externa terminar; falha pode deixar plano `ACTIVE` sem assinatura ou Pix inicial;
 - apadrinhamento Pix pode ficar reservado mesmo após erro de criação da cobrança;
 - `addInterval()` usa `Date.setMonth`, fazendo 31 de janeiro avançar para março em alguns anos.
@@ -216,11 +215,11 @@ Regra recomendada: introduzir estados `CREATING`, `ACTIVE`, `PAST_DUE`, `CANCEL_
 
 Uma seleção de apadrinhamento força recorrência mensal e aceita Pix ou cartão. O afilhado é associado ao doador da recorrência e volta a `AVAILABLE` quando o plano termina.
 
-O código atual aceita selecionar um afilhado já `SPONSORED` e sobrescreve o patrocinador. A reserva também não testa atomicamente o resultado do update. A regra correta precisa ser:
+O código valida disponibilidade no checkout e o claim agora ocorre somente após pagamento, com condição atômica `AVAILABLE` + patrocinador nulo. A regra vigente é:
 
 - somente `AVAILABLE` pode ser reservado;
-- claim condicional atômico com `count === 1`;
-- claim e criação da recorrência na mesma unidade de consistência local;
+- claim condicional atômico, sem sobrescrever patrocinador existente;
+- claim somente após confirmação do primeiro pagamento;
 - compensação segura se a operação no gateway falhar;
 - política explícita para troca de patrocinador e pagamentos atrasados.
 
@@ -242,9 +241,9 @@ DRAFT -> OPEN -> CLOSED -> DRAWN
 
 Números possuem unicidade `(raffleId, number)`, o que protege a corrida de reserva. Somente tickets `PAID` participam do sorteio.
 
-O resultado atual é `sha256(seed) mod quantidade`, aplicado à lista ordenada de tickets. Isso é reproduzível, mas não imparcial: o operador escolhe a seed depois de conhecer a lista e consegue testar seeds até selecionar qualquer índice. Uma solução auditável exige compromisso prévio da seed, fonte pública de entropia posterior ao fechamento ou serviço de aleatoriedade verificável.
+O resultado é `sha256(seed) mod quantidade`, aplicado à lista ordenada de tickets. A seed é gerada pelo servidor no fechamento, fica gravada antes do sorteio e a transição `CLOSED -> OPEN` é proibida; o operador não escolhe a seed após conhecer a lista.
 
-Boleto fica válido por três dias, mas a reserva é limpa após 24 horas. Um pagamento no segundo ou terceiro dia pode ser confirmado sem o número originalmente comprado.
+Boleto fica válido por três dias e a limpeza de reservas considera `expiresAt`/`dueAt` do pagamento; a janela de 24 horas não libera mais um boleto ainda válido.
 
 A operação de rifa e sua mecânica também exigem validação jurídica separada antes de lançamento.
 
@@ -252,7 +251,7 @@ A operação de rifa e sua mecânica também exigem validação jurídica separa
 
 O estoque é controlado por `EventTicketType.sold`, que inclui reservas e ingressos confirmados. A reserva usa update condicional e cria tickets na mesma transação.
 
-Há um erro confirmado na compensação: quando a transação falha, o banco já desfaz os incrementos, mas o catch decrementa `sold` novamente. O contador pode ficar abaixo do real e permitir overselling.
+Falhas dentro da transação revertem integralmente os incrementos; não há mais decremento duplicado no `catch`.
 
 Outras regras:
 
@@ -275,15 +274,14 @@ Lacunas:
 
 - identidade do licitante não é verificada; qualquer pessoa pode licitar com e-mail de terceiro;
 - não há depósito, pré-autorização ou limite acumulado contra abuso;
-- o lote vira `SOLD` antes da cobrança; se a cobrança falha antes de criar `donationId`, o job de cobrança posterior nunca o seleciona;
-- workers concorrentes podem liquidar o mesmo lote sem claim atômico;
-- cobrança criada no gateway antes de falha local pode ficar órfã.
+- o claim de liquidação agora é atômico e o lote não fica `SOLD` sem doação correspondente;
+- a cobrança usa identificador determinístico por lote/vencedor/lance para permitir retry idempotente; ainda é necessário conciliar cobranças órfãs no gateway.
 
 ## 14. Eventos de saída e integrações
 
 Webhooks de saída são assinados com HMAC-SHA256 e repetidos pelo BullMQ. A organização informa qualquer URL HTTPS.
 
-Regra de segurança necessária: bloquear destinos privados, loopback, link-local, redes reservadas, redirects e DNS rebinding; idealmente usar egress proxy e allowlist por IP resolvido. A validação atual de apenas `https://` não impede SSRF.
+O teste de endpoint bloqueia redes privadas, loopback, link-local, credenciais embutidas, portas arbitrárias e redirects. Ainda é necessário egress proxy/DNS pinning para eliminar completamente rebinding.
 
 ## 15. Decisões obrigatórias antes das próximas mudanças
 

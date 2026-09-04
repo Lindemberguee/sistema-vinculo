@@ -1,6 +1,8 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -200,8 +202,18 @@ export async function testWebhookEndpoint(orgId: string, urlOverride?: string): 
     if (target.pathname !== path) {
       return { ok: false, error: `O caminho da URL precisa ser ${path}.` };
     }
-    if (target.hostname === "169.254.169.254") {
-      return { ok: false, error: "Host não permitido." };
+    if (target.username || target.password || (target.port && !["80", "443"].includes(target.port))) {
+      return { ok: false, error: "Host, credenciais ou porta não permitidos." };
+    }
+    if (!isLocal) {
+      try {
+        const resolved = await lookup(target.hostname, { all: true, verbatim: true });
+        if (resolved.some(({ address }) => isPrivateAddress(address))) {
+          return { ok: false, error: "Host não permitido: o endereço resolve para uma rede privada." };
+        }
+      } catch {
+        return { ok: false, error: "Não foi possível resolver o host da URL." };
+      }
     }
 
     // 2) What Pagar.me reports about deliveries to this URL. Best-effort — a
@@ -274,6 +286,21 @@ export async function testWebhookEndpoint(orgId: string, urlOverride?: string): 
     if (err instanceof Error) return { ok: false, error: err.message };
     throw err;
   }
+}
+
+function isPrivateAddress(address: string): boolean {
+  if (isIP(address) === 4) {
+    const octets = address.split(".").map(Number);
+    const [a, b] = octets;
+    if (a === undefined || b === undefined) return true;
+    return a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a === 0;
+  }
+  if (isIP(address) === 6) {
+    const normalized = address.toLowerCase();
+    if (normalized.startsWith("::ffff:")) return isPrivateAddress(normalized.slice(7));
+    return normalized === "::1" || normalized === "::" || normalized.startsWith("fe80:") || normalized.startsWith("fc") || normalized.startsWith("fd");
+  }
+  return true;
 }
 
 /**

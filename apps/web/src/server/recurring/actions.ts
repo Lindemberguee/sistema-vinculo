@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma, releaseSponseeForPlan, resolveOrgGateway } from "@donation/db";
-import { isAppError } from "@donation/shared";
+import { isAppError, PaymentError } from "@donation/shared";
 import { recurringCanceledEmail, sendEmail } from "@donation/emails";
 import { requireOrgAccess } from "@/server/auth-helpers";
 import { emitOutboundEvent } from "@/server/webhooks/emit";
@@ -25,6 +25,10 @@ async function cancelPlan(planId: string, reason: "requested" | "failed"): Promi
       await gateway.cancelSubscription(plan.gatewaySubscriptionId);
     } catch (err) {
       console.warn("cancelSubscription failed:", err instanceof Error ? err.message : err);
+      // Do not confirm cancellation locally when the provider did not confirm
+      // it. Otherwise a live subscription could keep charging after we
+      // released the sponsee and sent a false confirmation.
+      throw new PaymentError("Não foi possível confirmar o cancelamento no gateway. Tente novamente.");
     }
   }
 

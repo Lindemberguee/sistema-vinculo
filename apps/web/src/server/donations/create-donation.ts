@@ -186,15 +186,6 @@ export async function createDonation(params: CreateDonationParams) {
   const recurringCard = wantsRecurring && params.method === "CREDIT_CARD";
   const recurringPix = wantsRecurring && params.method === "PIX";
 
-  async function claimSponsee() {
-    const s = sponsee;
-    if (!s) return;
-    await prisma.sponsee.updateMany({
-      where: { id: s.id, status: { in: ["AVAILABLE", "SPONSORED"] } },
-      data: { status: "SPONSORED", sponsorDonorId: donor.id, sponsoredAt: new Date() },
-    });
-  }
-
   // ── Card subscription: no Donation row now — the `subscription.charged`
   //    webhook creates one per cycle (including the first). ─────────────
   if (recurringCard) {
@@ -232,7 +223,6 @@ export async function createDonation(params: CreateDonationParams) {
     });
 
     await prisma.recurringPlan.update({ where: { id: planRow.id }, data: { gatewaySubscriptionId: subscriptionId } });
-    await claimSponsee();
 
     return {
       donation: { id: planRow.id, status: "PENDING" as const, paymentDetails: null },
@@ -263,7 +253,6 @@ export async function createDonation(params: CreateDonationParams) {
       select: { id: true },
     });
     recurringPlanId = planRow.id;
-    await claimSponsee();
   }
 
   const donationId = randomUUID();

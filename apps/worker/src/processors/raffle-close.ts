@@ -1,9 +1,9 @@
+import { randomBytes } from "node:crypto";
 import { prisma } from "@donation/db";
 
 /**
  * Auto-close raffles whose `drawAt` has passed. The draw itself stays manual
- * (an operator supplies the seed) — this only flips OPEN → CLOSED so sales stop
- * and the "Sortear" action unlocks in the panel.
+ * — this commits server-side entropy and flips OPEN → CLOSED so sales stop.
  */
 export async function closeRafflesPastDraw(): Promise<{ closed: number }> {
   const now = new Date();
@@ -14,7 +14,7 @@ export async function closeRafflesPastDraw(): Promise<{ closed: number }> {
   });
 
   for (const r of due) {
-    await prisma.raffle.update({ where: { id: r.id }, data: { status: "CLOSED" } });
+    await prisma.raffle.update({ where: { id: r.id }, data: { status: "CLOSED", drawSeed: randomBytes(32).toString("hex") } });
     await prisma.auditLog.create({
       data: {
         organizationId: r.organizationId,

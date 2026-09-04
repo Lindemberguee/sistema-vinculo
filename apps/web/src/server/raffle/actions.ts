@@ -99,7 +99,9 @@ export async function updateRaffle(orgId: string, raffleId: string, formData: Fo
 const TRANSITIONS: Record<string, string[]> = {
   DRAFT: ["OPEN", "CANCELED"],
   OPEN: ["CLOSED", "CANCELED"],
-  CLOSED: ["OPEN", "CANCELED"],
+  // Closing commits the draw entropy; reopening would let an operator change
+  // the eligible ticket set after seeing the committed seed.
+  CLOSED: ["CANCELED"],
 };
 
 export async function setRaffleStatus(
@@ -114,7 +116,12 @@ export async function setRaffleStatus(
     if (!TRANSITIONS[r.status]?.includes(next)) {
       return { ok: false, error: `Transição inválida: ${r.status} → ${next}` };
     }
-    await db.raffle.update({ where: { id: raffleId }, data: { status: next } });
+    await db.raffle.update({
+      where: { id: raffleId },
+      // Commit entropy when sales close. The operator cannot choose a seed
+      // after seeing the final paid ticket set.
+      data: { status: next, ...(next === "CLOSED" ? { drawSeed: randomBytes(32).toString("hex") } : {}) },
+    });
   } catch (err) {
     if (isAppError(err)) return { ok: false, error: err.message };
     throw err;
@@ -123,18 +130,18 @@ export async function setRaffleStatus(
   return { ok: true };
 }
 
-/** Draw a winner among PAID tickets. Auditable: idx = sha256(seed) mod paidCount. */
-export async function drawRaffle(orgId: string, raffleId: string, seedInput: string): Promise<RaffleResult> {
+/** Draw a winner among PAID tickets using entropy committed when sales closed. */
+export async function drawRaffle(orgId: string, raffleId: string, _seedInput: string): Promise<RaffleResult> {
   try {
     const { db, userId } = await requireOrgAccess(orgId, "EDITOR");
-    const seed = seedInput.trim() || randomBytes(16).toString("hex");
 
     const raffle = await db.raffle.findFirst({
       where: { id: raffleId },
-      select: { status: true, title: true, prize: true, organization: { select: { displayName: true, slug: true } } },
+      select: { status: true, drawSeed: true, title: true, prize: true, organization: { select: { displayName: true, slug: true } } },
     });
     if (!raffle) return { ok: false, error: "Rifa não encontrada" };
     if (raffle.status !== "CLOSED") return { ok: false, error: "Feche a rifa antes de sortear" };
+    const seed = raffle.drawSeed ?? randomBytes(32).toString("hex");
 
     const paid = await db.raffleTicket.findMany({
       where: { raffleId, status: "PAID" },
@@ -146,8 +153,8 @@ export async function drawRaffle(orgId: string, raffleId: string, seedInput: str
     const idx = drawWinnerIndex(seed, paid.length);
     const winner = paid[idx]!;
 
-    await db.raffle.update({
-      where: { id: raffleId },
+    const claimed = await db.raffle.updateMany({
+      where: { id: raffleId, status: "CLOSED" },
       data: {
         status: "DRAWN",
         drawSeed: seed,
@@ -156,6 +163,7 @@ export async function drawRaffle(orgId: string, raffleId: string, seedInput: str
         drawnAt: new Date(),
       },
     });
+    if (claimed.count !== 1) return { ok: false, error: "A rifa já foi sorteada por outro operador." };
     await db.auditLog.create({
       data: {
         organizationId: orgId,

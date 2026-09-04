@@ -77,8 +77,11 @@ export async function POST(req: Request) {
       skipDuplicates: true,
     });
 
-    // Already seen → acknowledge and stop (idempotent).
+    // A previous delivery may have committed the inbox row but failed before
+    // publishing to Redis. Re-enqueue duplicates; BullMQ's jobId keeps this
+    // idempotent while recovering the lost hand-off.
     if (created.count === 0) {
+      await enqueueGatewayEvent({ gatewayEventId: event.id });
       return NextResponse.json({ ok: true, duplicate: true });
     }
 

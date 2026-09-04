@@ -43,7 +43,9 @@ export async function markChargePaid(chargeId: string, gatewayFeeCents = 0): Pro
 
   await prisma.$transaction(async (tx) => {
     const donation = await tx.donation.findUnique({ where: { gatewayChargeId: chargeId } });
-    if (!donation || donation.status === "PAID") return;
+    // Paid events are idempotent; terminal negative states must never be
+    // resurrected by a late/out-of-order paid webhook.
+    if (!donation || !["CREATED", "PENDING"].includes(donation.status)) return;
     donorId = donation.donorId;
     emit = {
       organizationId: donation.organizationId,
@@ -121,7 +123,7 @@ export async function markChargePaid(chargeId: string, gatewayFeeCents = 0): Pro
     if (donation.recurringPlanId) {
       const plan = await tx.recurringPlan.findUnique({
         where: { id: donation.recurringPlanId },
-        select: { interval: true, status: true },
+        select: { interval: true, status: true, sponseeId: true },
       });
       if (plan && plan.status !== "CANCELED") {
         await tx.recurringPlan.update({
@@ -132,6 +134,12 @@ export async function markChargePaid(chargeId: string, gatewayFeeCents = 0): Pro
             nextChargeAt: addInterval(new Date(), plan.interval),
           },
         });
+        if (plan.sponseeId) {
+          await tx.sponsee.updateMany({
+            where: { id: plan.sponseeId, status: "AVAILABLE", sponsorDonorId: null },
+            data: { status: "SPONSORED", sponsorDonorId: donation.donorId, sponsoredAt: new Date() },
+          });
+        }
       }
     }
 
@@ -200,7 +208,7 @@ export async function recordSubscriptionCharge(params: {
   if (existing) return "noop";
 
   const plan = await prisma.recurringPlan.findFirst({
-    where: { gatewaySubscriptionId: params.subscriptionId },
+    where: { gatewaySubscriptionId: params.subscriptionId, status: { not: "CANCELED" } },
     include: { organization: { select: { planId: true } } },
   });
   if (!plan) {
@@ -269,6 +277,12 @@ export async function recordSubscriptionCharge(params: {
       where: { id: plan.id },
       data: { status: "ACTIVE", failedAttempts: 0, lastAttemptAt: new Date(), nextChargeAt: addInterval(new Date(), plan.interval) },
     });
+    if (plan.sponseeId) {
+      await tx.sponsee.updateMany({
+        where: { id: plan.sponseeId, status: "AVAILABLE", sponsorDonorId: null },
+        data: { status: "SPONSORED", sponsorDonorId: plan.donorId, sponsoredAt: new Date() },
+      });
+    }
     await tx.auditLog.create({
       data: {
         organizationId: plan.organizationId,
@@ -304,17 +318,24 @@ export async function handleSubscriptionFailure(subscriptionId: string): Promise
   const nome = firstName(plan.donor.name);
 
   if (attempts >= MAX_DUNNING_ATTEMPTS) {
-    await prisma.recurringPlan.update({
-      where: { id: plan.id },
-      data: { status: "CANCELED", failedAttempts: attempts, canceledAt: new Date() },
-    });
-    await releaseSponseeForPlan(prisma, plan.id);
     try {
       const { gateway } = await resolveOrgGateway(plan.organizationId);
       await gateway.cancelSubscription(subscriptionId);
     } catch (err) {
       console.warn("cancelSubscription during dunning failed:", err instanceof Error ? err.message : err);
+      // Keep the plan PAST_DUE until the provider confirms cancellation. A
+      // local CANCELED state here would allow charges to continue unnoticed.
+      await prisma.recurringPlan.update({
+        where: { id: plan.id },
+        data: { status: "PAST_DUE", failedAttempts: attempts, lastAttemptAt: new Date() },
+      });
+      return;
     }
+    await prisma.recurringPlan.update({
+      where: { id: plan.id },
+      data: { status: "CANCELED", failedAttempts: attempts, canceledAt: new Date() },
+    });
+    await releaseSponseeForPlan(prisma, plan.id);
     const email = await renderOrgEmail(plan.organizationId, "SUBSCRIPTION_CANCELED", { NOME: nome });
     await sendEmail(plan.donor.email, email, { from: sender.from, replyTo: sender.replyTo });
     try {

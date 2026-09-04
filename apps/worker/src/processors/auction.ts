@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { prisma, renderOrgEmail, resolveOrgGateway, resolveOrgSender } from "@donation/db";
 import { formatBRL } from "@donation/shared";
 import { BYOG_FEE_CONFIG, calculateFees } from "@donation/payments";
@@ -44,7 +44,11 @@ async function billWinner(params: {
       tipCents: 0,
       config: BYOG_FEE_CONFIG,
     });
-    const donationId = randomUUID();
+    // Stable id makes a retry after a gateway success/database failure reuse
+    // the provider's idempotency key instead of opening a second charge.
+    const donationId = createHash("sha256")
+      .update(`auction:${params.lotId}:${params.donorId}:${params.bidCents}`)
+      .digest("hex");
     const order = await resolved.gateway.createOrder({
       donationId,
       method: "PIX",
@@ -135,18 +139,19 @@ export async function settleEndedLots(): Promise<{ settled: number; sold: number
       select: { name: true, email: true },
     });
 
-    await prisma.lot.update({
-      where: { id: lot.id },
-      data: { status: "SOLD", winnerDonorId: lot.currentBidderDonorId, winningBidCents: lot.currentBidCents },
-    });
-    sold++;
-
     if (!org || org.status !== "ACTIVE" || !donor) {
-      console.warn(`settle: lot ${lot.id} sold but cannot bill (org not ready)`);
+      console.warn(`settle: lot ${lot.id} cannot be billed (org or donor not ready)`);
       continue;
     }
 
-    await billWinner({
+    const claimed = await prisma.lot.updateMany({
+      where: { id: lot.id, status: "ACTIVE" },
+      data: { status: "SOLD", winnerDonorId: lot.currentBidderDonorId, winningBidCents: lot.currentBidCents },
+    });
+    if (claimed.count !== 1) continue; // another worker already settled it
+    sold++;
+
+    const billed = await billWinner({
       lotId: lot.id,
       lotTitle: lot.title,
       organizationId: lot.organizationId,
@@ -158,6 +163,14 @@ export async function settleEndedLots(): Promise<{ settled: number; sold: number
       orgName: org.displayName,
       orgSlug: org.slug,
     });
+    if (!billed) {
+      // Never leave a lot SOLD without a corresponding Donation. The next
+      // auction cycle may be started manually after the gateway is repaired.
+      await prisma.lot.update({
+        where: { id: lot.id },
+        data: { status: "UNSOLD", winnerDonorId: null, winningBidCents: null },
+      });
+    }
   }
 
   return { settled: lots.length, sold };
