@@ -3,10 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "packageManager": "pnpm@9.12.0",
+  "prisma": {
+    "schema": "packages/db/prisma/schema.prisma"
+  },
   "engines": {
     "node": ">=20.11.0"
   },
   "scripts": {
+    "postinstall": "pnpm --filter @donation/db generate",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "turbo run start",
