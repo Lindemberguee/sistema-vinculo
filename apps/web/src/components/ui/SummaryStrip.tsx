@@ -24,12 +24,12 @@ export function SummaryStrip({
   const total = segments?.reduce((s, x) => s + x.value, 0) ?? 0;
 
   return (
-    <div className={cn("card p-5", className)}>
-      <dl className="flex flex-wrap gap-y-3 [&>*+*]:ml-8 [&>*+*]:border-l [&>*+*]:border-line [&>*+*]:pl-8">
+    <div className={cn("card p-4 sm:p-5", className)} role="group" aria-label="Resumo">
+      <dl className="grid grid-cols-2 gap-x-5 gap-y-4 sm:flex sm:flex-wrap sm:gap-y-3 sm:[&>*+*]:ml-8 sm:[&>*+*]:border-l sm:[&>*+*]:border-line sm:[&>*+*]:pl-8">
         {stats.map((s) => (
-          <div key={s.label}>
+          <div key={s.label} className="min-w-0">
             <dt className="eyebrow">{s.label}</dt>
-            <dd className="mt-0.5 text-num text-lg">{s.value}</dd>
+            <dd className="mt-0.5 truncate text-num text-lg">{s.value}</dd>
           </div>
         ))}
       </dl>

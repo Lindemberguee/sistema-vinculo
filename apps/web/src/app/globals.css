@@ -196,6 +196,7 @@
   justify-content: center;
   gap: 0.4rem;
   border-radius: var(--radius-pill);
+  min-height: 2.5rem;
   padding: 0.5rem 1rem;
   font-size: 0.8125rem;
   font-weight: 500;
@@ -209,13 +210,14 @@
   white-space: nowrap;
 }
 @utility btn-sm {
+  min-height: 2.25rem;
   padding: 0.34rem 0.7rem;
   font-size: 0.75rem;
 }
 @utility btn-icon {
   padding: 0;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
 @utility badge {
@@ -306,6 +308,9 @@
     cursor: not-allowed;
     opacity: 0.5;
   }
+  .btn:not(:disabled):active {
+    transform: translateY(1px);
+  }
   .btn-primary {
     @apply btn bg-brand-600 text-white hover:bg-brand-700;
   }
@@ -320,8 +325,10 @@
   }
 
   .input {
-    @apply w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink
-      placeholder:text-faint focus:border-brand-500 focus:outline-none;
+    @apply min-h-11 w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink
+      placeholder:text-faint transition-[border-color,box-shadow] duration-150
+      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/15
+      disabled:cursor-not-allowed disabled:bg-canvas disabled:opacity-70;
   }
   /* Field marks its wrapper; the control inside picks up the state colour. */
   label[data-invalid] .input,
@@ -380,7 +387,7 @@
   }
 
   .card {
-    @apply rounded-xl border border-line bg-surface;
+    @apply rounded-xl border border-line bg-surface shadow-card;
   }
 
   .label {
@@ -416,7 +423,7 @@
   }
 
   .th {
-    @apply px-4 py-2.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-faint;
+    @apply whitespace-nowrap px-4 py-2.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-faint;
   }
   .td {
     @apply px-4 py-3 text-sm;

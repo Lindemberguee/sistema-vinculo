@@ -86,11 +86,11 @@ export default async function DonorDetail({
         actions={<ContactLinks email={donor.email} phone={donor.phone} />}
       />
 
-      <section className="mb-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+      <section aria-label="Resumo do doador" className="card mb-7 grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map(([v, l]) => (
-          <div key={l}>
-            <strong className="tabular-nums">{v}</strong>
-            <div className="text-xs text-muted">{l}</div>
+          <div key={l} className="min-w-0">
+            <strong className="block truncate text-lg font-semibold tabular-nums tracking-tight">{v}</strong>
+            <div className="mt-0.5 text-xs text-muted">{l}</div>
           </div>
         ))}
       </section>
@@ -98,7 +98,7 @@ export default async function DonorDetail({
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
         {/* Main column — activity */}
         <div className="min-w-0 space-y-4 lg:order-1">
-          <h2 className="text-sm font-semibold">Linha do tempo</h2>
+          <h2 className="text-heading">Linha do tempo</h2>
           <DonorTimeline orgId={orgId} donorId={donorId} items={timeline} members={memberOpts} />
 
           <Card>
@@ -143,7 +143,7 @@ export default async function DonorDetail({
         </div>
 
         {/* Side column — profile */}
-        <aside className="space-y-4 lg:order-2">
+        <aside className="space-y-4 lg:sticky lg:top-20 lg:order-2 lg:self-start">
           <DonorRelationshipCard
             orgId={orgId}
             donorId={donorId}

@@ -15,21 +15,21 @@ export function PageHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <header className="mb-6">
+    <header className="mb-7 space-y-2">
       {back && (
         <Link
           href={back.href}
-          className="mb-2.5 inline-flex items-center gap-1 text-xs font-medium text-muted transition-colors hover:text-ink"
+          className="inline-flex min-h-8 items-center gap-1 rounded-md px-1 text-xs font-medium text-muted transition-colors hover:bg-surface hover:text-ink"
         >
-          <span aria-hidden>‹</span> {back.label}
+          <span aria-hidden>←</span> {back.label}
         </Link>
       )}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-title">{title}</h1>
-          {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-title text-balance">{title}</h1>
+          {description && <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>}
         </div>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </header>
   );

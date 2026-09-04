@@ -40,7 +40,7 @@ const SECTIONS: Record<string, { group?: string; label: string }> = {
 /** `/orgs/<id>/campaigns/<cid>/editor` → breadcrumb parts for the top bar. */
 function breadcrumb(pathname: string, orgId: string) {
   const segs = pathname.split("/").filter(Boolean); // ["orgs", id, "campaigns", ...]
-  const section = segs[2] === orgId ? (segs[3] ?? "") : "";
+  const section = segs[1] === orgId ? (segs[2] ?? "") : "";
   const meta = SECTIONS[section] ?? { label: section };
   const isDeep = segs.length > (section ? 4 : 3);
   const base = `/orgs/${orgId}`;
@@ -76,6 +76,7 @@ export function PanelChrome({
   const [collapsed, setCollapsed] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -106,6 +107,22 @@ export function PanelChrome({
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Tab") return;
+      const root = drawerRef.current;
+      if (!root) return;
+      const focusable = root.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
@@ -145,6 +162,7 @@ export function PanelChrome({
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-ink/40" onClick={() => setOpen(false)} aria-hidden />
           <div
+            ref={drawerRef}
             role="dialog"
             aria-modal="true"
             aria-label="Navegação principal"

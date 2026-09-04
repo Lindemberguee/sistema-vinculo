@@ -27,7 +27,11 @@ export function CheckInScanner({ orgId, eventId }: { orgId: string; eventId: str
   return (
     <div className="max-w-md">
       <form onSubmit={submit} className="flex gap-2">
+        <label htmlFor="checkin-code" className="sr-only">
+          Código do ingresso
+        </label>
         <input
+          id="checkin-code"
           ref={inputRef}
           autoFocus
           className="input"
@@ -35,13 +39,15 @@ export function CheckInScanner({ orgId, eventId }: { orgId: string; eventId: str
           value={code}
           onChange={(e) => setCode(e.target.value)}
         />
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" loading={pending}>
           Validar
         </Button>
       </form>
 
       {result && (
         <div
+          role={result.ok ? "status" : "alert"}
+          aria-live="polite"
           className={
             "mt-4 rounded-xl border p-4 " +
             (result.ok ? "border-transparent bg-success-bg text-success" : "border-transparent bg-danger-bg text-danger")

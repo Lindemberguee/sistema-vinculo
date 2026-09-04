@@ -1,9 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setCampaignStatus } from "@/server/campaigns/actions";
-import { Button, StatusBadge } from "@/components/ui";
+import { Alert, Button, StatusBadge } from "@/components/ui";
 
 export function CampaignStatusControls({
   orgId,
@@ -15,11 +15,17 @@ export function CampaignStatusControls({
   status: string;
 }) {
   const [pending, start] = useTransition();
+  const [feedback, setFeedback] = useState<string | null>(null);
   const router = useRouter();
 
   function go(next: "PAUSED" | "PUBLISHED" | "CLOSED") {
     start(async () => {
-      await setCampaignStatus(orgId, campaignId, next);
+      setFeedback(null);
+      const result = await setCampaignStatus(orgId, campaignId, next);
+      if (!result.ok) {
+        setFeedback(result.error ?? "Não foi possível atualizar o status.");
+        return;
+      }
       router.refresh();
     });
   }
@@ -28,20 +34,21 @@ export function CampaignStatusControls({
     <div className="flex flex-wrap items-center gap-2">
       <StatusBadge status={status} />
       {status === "PUBLISHED" && (
-        <Button variant="secondary" size="sm" disabled={pending} onClick={() => go("PAUSED")}>
+        <Button variant="secondary" size="sm" loading={pending} onClick={() => go("PAUSED")}>
           Pausar
         </Button>
       )}
       {(status === "PAUSED" || status === "CLOSED") && (
-        <Button variant="secondary" size="sm" disabled={pending} onClick={() => go("PUBLISHED")}>
+        <Button variant="secondary" size="sm" loading={pending} onClick={() => go("PUBLISHED")}>
           Reativar
         </Button>
       )}
       {status !== "CLOSED" && (
-        <Button variant="secondary" size="sm" disabled={pending} onClick={() => go("CLOSED")} className="text-danger">
+        <Button variant="secondary" size="sm" loading={pending} onClick={() => go("CLOSED")} className="text-danger">
           Encerrar
         </Button>
       )}
+      {feedback && <Alert tone="danger">{feedback}</Alert>}
     </div>
   );
 }
