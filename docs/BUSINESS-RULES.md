@@ -207,7 +207,6 @@ Pendências ainda abertas:
 - retry/DLQ e estado explícito `CANCEL_PENDING` ainda não existem para indisponibilidade prolongada do gateway;
 - criação da recorrência ocorre antes de a operação externa terminar; falha pode deixar plano `ACTIVE` sem assinatura ou Pix inicial;
 - apadrinhamento Pix pode ficar reservado mesmo após erro de criação da cobrança;
-- `addInterval()` usa `Date.setMonth`, fazendo 31 de janeiro avançar para março em alguns anos.
 
 Regra recomendada: introduzir estados `CREATING`, `ACTIVE`, `PAST_DUE`, `CANCEL_PENDING`, `CANCELED`, registrar cada comando externo com idempotência e só confirmar cancelamento após resposta/webhook do gateway.
 

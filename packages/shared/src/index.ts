@@ -33,7 +33,11 @@ export type WebhookEventName = (typeof WEBHOOK_EVENTS)[number];
 /** Advance a date by one recurring interval. */
 export function addInterval(from: Date, interval: "MONTHLY" | "YEARLY"): Date {
   const d = new Date(from);
+  const day = d.getDate();
+  d.setDate(1); // avoid Jan 31 → Mar when the target month is shorter
   if (interval === "YEARLY") d.setFullYear(d.getFullYear() + 1);
   else d.setMonth(d.getMonth() + 1);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
   return d;
 }

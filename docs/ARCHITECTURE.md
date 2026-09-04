@@ -245,7 +245,7 @@ Em 04/09/2026:
 - build de produção do Next.js: aprovado;
 - TypeScript `--noEmit` nos sete pacotes/apps: aprovado;
 - Prisma schema validate: aprovado, com aviso de configuração que será removida no Prisma 7;
-- testes: 20 arquivos e 151 casos aprovados (121 web, 19 payments, 7 blocks, 4 shared; contagem atual após os testes de BYOG);
+- testes: 21 arquivos e 153 casos aprovados (121 web, 19 payments, 7 blocks, 6 shared; contagem atual após os testes de BYOG e datas mensais);
 - lint: não operacional;
 - cobertura: não configurada;
 - testes de worker, integração com banco/Redis e E2E: ausentes.
