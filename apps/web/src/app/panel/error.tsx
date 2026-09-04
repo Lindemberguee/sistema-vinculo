@@ -22,7 +22,7 @@ export default function PanelError({
         <span className="mx-auto grid size-11 place-items-center rounded-full bg-danger-bg text-danger">
           <AlertTriangle className="size-5" aria-hidden />
         </span>
-        <h1 className="mt-4 text-heading">Não foi possível carregar o painel</h1>
+        <h1 className="mt-4 text-heading">Não foi possível carregar esta página</h1>
         <p className="mt-2 text-sm text-muted">
           Ocorreu um erro inesperado. Tente novamente; se continuar, volte ao início e avise o suporte.
         </p>
