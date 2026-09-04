@@ -1,0 +1,424 @@
+@import "tailwindcss";
+
+/* ─────────────────────────── Design tokens ─────────────────────────── */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Brand — verde institucional */
+  --color-brand-50: #eef6f2;
+  --color-brand-100: #d6ebe2;
+  --color-brand-200: #a8d6c6;
+  --color-brand-300: #6fb9a1;
+  --color-brand-400: #379a7c;
+  --color-brand-500: #0d8061;
+  --color-brand-600: #006b4f;
+  --color-brand-700: #075642;
+  --color-brand-800: #0a4536;
+  --color-brand-900: #0b382d;
+
+  /* decorative only — never carries text (dourado institucional, realces) */
+  --color-accent-400: #d4b980;
+  --color-accent-500: #c5a059;
+  --color-accent-600: #a9863f;
+
+  /* Neutros — quentes e discretos */
+  --color-ink: #17201c;
+  --color-muted: #616b66;
+  --color-faint: #6b756f; /* AA on white (~4.6:1) — safe for eyebrow/th/placeholder text */
+  --color-hairline: #96a09a; /* decorative only: dots, chevrons, sparkline */
+  --color-line: #ececeb;
+  --color-line-strong: #e0e0de;
+  --color-surface: #ffffff;
+  /* keep in sync with `CANVAS` in packages/tokens/src/index.ts (e-mail shell bg) */
+  --color-canvas: #f8f8f6;
+  --color-surface-sunken: #f0f0ee; /* bar tracks, inset wells, code blocks */
+  --color-surface-overlay: rgb(23 32 28 / 0.4); /* scrims behind drawers/modals */
+
+  /* Semânticos */
+  --color-danger: #b3261e;
+  --color-danger-bg: #fdeceb;
+  /* darker than the "success"/"warn" swatch used for icons/large text — the
+     11px badge label needs the extra margin to clear 4.5:1 on its own -bg */
+  --color-success: #16794c;
+  --color-success-bg: #e8f5ee;
+  --color-success-text: #0f6b43;
+  --color-warn: #8a6207;
+  --color-warn-bg: #fdf3dc;
+  --color-warn-text: #7a5606;
+  --color-info: #1f5f8b;
+  --color-info-bg: #e7f0f7;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-pill: 9999px;
+
+  --shadow-card: 0 1px 2px rgb(20 24 22 / 0.04);
+  --shadow-pop: 0 8px 24px -6px rgb(20 24 22 / 0.12), 0 2px 6px -2px rgb(20 24 22 / 0.08);
+
+  /* Elevation order — use z-<name> utilities so stacking stays intentional */
+  --z-index-base: 0;
+  --z-index-sticky: 20;
+  --z-index-dropdown: 40;
+  --z-index-drawer: 50;
+  --z-index-modal: 60;
+  --z-index-toast: 70;
+
+  /* Motion — see @media (prefers-reduced-motion) below */
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 260ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Semantic indirection layer — kept out of @theme on purpose (no util noise like
+   `text-text`). Consume via var() in component CSS; a future dark theme overrides
+   just these, not hundreds of classes. */
+:root {
+  --color-text: var(--color-ink);
+  --color-text-muted: var(--color-muted);
+  --color-text-subtle: var(--color-faint);
+  --color-border: var(--color-line);
+  --color-border-strong: var(--color-line-strong);
+}
+
+/* ─────────────────────────── Dark theme ───────────────────────────
+   Opt-in, PANEL ONLY (the panel layout sets data-theme from a cookie).
+   Public sites and e-mails never get this attribute. Overrides the raw
+   scale tokens so every `bg-canvas` / `text-ink` / `border-line` utility
+   flips without touching a single component class.
+   Starter palette — coherent, but expect a polish pass. */
+[data-theme="dark"] {
+  --color-canvas: #14181a;
+  --color-surface: #1c2123;
+  --color-surface-sunken: #24292c;
+  --color-surface-overlay: rgb(0 0 0 / 0.6);
+
+  --color-ink: #e9ebe9;
+  --color-muted: #a7afac;
+  --color-faint: #8b938f;
+  --color-hairline: #4a524e;
+  --color-line: #2b3134;
+  --color-line-strong: #363d40;
+
+  /* Note the role swap: 700 goes LIGHT so `text-brand-700` chips read on dark;
+     `.btn-primary` below is re-pointed so its hover doesn't use 700. */
+  --color-brand-500: #1f9d79;
+  --color-brand-600: #0a815f;
+  --color-brand-700: #4cbe97;
+  --color-brand-50: #123c30;
+
+  --color-danger: #f0857c;
+  --color-danger-bg: #3a1c1a;
+  --color-success: #56c48f;
+  --color-success-bg: #123021;
+  --color-success-text: var(--color-success); /* already light enough at 11px in dark */
+  --color-warn: #d8b45f;
+  --color-warn-bg: #322810;
+  --color-warn-text: var(--color-warn);
+  --color-info: #6fb0dd;
+  --color-info-bg: #17303f;
+
+  --color-text: var(--color-ink);
+  --color-text-muted: var(--color-muted);
+  --color-text-subtle: var(--color-faint);
+  --color-border: var(--color-line);
+  --color-border-strong: var(--color-line-strong);
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 10px 30px -8px rgb(0 0 0 / 0.55), 0 3px 8px -3px rgb(0 0 0 / 0.4);
+
+  color-scheme: dark;
+}
+/* Green primitives that assume light→dark scale need a dark-specific hover/text. */
+[data-theme="dark"] .btn-primary:hover {
+  background: color-mix(in srgb, var(--color-brand-600), #000 12%);
+}
+[data-theme="dark"] .btn-ghost {
+  color: var(--color-brand-700);
+}
+
+/* ───────────────────────────── Base ───────────────────────────────── */
+@layer base {
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.014em;
+  }
+  a {
+    color: inherit;
+  }
+  ::selection {
+    background: var(--color-brand-100);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  /* numbers align in tables and stats */
+  .tabular-nums,
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Respect the OS "reduce motion" setting everywhere. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ───────────────────── Custom utilities (v4 @utility) ──────────────── */
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: var(--radius-pill);
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard);
+  user-select: none;
+  white-space: nowrap;
+}
+@utility btn-sm {
+  padding: 0.34rem 0.7rem;
+  font-size: 0.75rem;
+}
+@utility btn-icon {
+  padding: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+@utility badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* ── Named type scale (§3.2) — use these instead of `text-[…px]` ─────
+   Semantic <h1>/<h2>/<h3> already get weight/line/tracking in @layer base;
+   these are for non-heading elements (stat values, labels, captions). */
+@utility text-display {
+  font-size: 2rem;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+@utility text-title {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+}
+@utility text-heading {
+  font-size: 1.125rem;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+@utility text-subhead {
+  font-size: 1rem;
+  line-height: 1.3;
+  font-weight: 600;
+}
+@utility text-body {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+@utility text-ui {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+@utility text-caption {
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+@utility text-eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* plain tiny labels (badges, nav sub-text) — no transform/tracking */
+@utility text-2xs {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+@utility text-3xs {
+  font-size: 0.625rem;
+  line-height: 1.35;
+}
+/** numbers: tabular + tight tracking + semibold (no size — pair with one) */
+@utility text-num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+/* small uppercase eyebrow label — alias of `text-eyebrow` + the faint colour */
+@utility eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+/* ───────────────────────── Components ─────────────────────────────── */
+@layer components {
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply btn border border-line-strong bg-surface text-ink hover:border-muted/40 hover:bg-canvas;
+  }
+  .btn-ghost {
+    @apply btn text-brand-600 hover:bg-brand-50;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:opacity-90;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink
+      placeholder:text-faint focus:border-brand-500 focus:outline-none;
+  }
+  /* Field marks its wrapper; the control inside picks up the state colour. */
+  label[data-invalid] .input,
+  label[data-invalid] .input:focus {
+    border-color: var(--color-danger);
+  }
+  label[data-success] .input {
+    border-color: var(--color-success);
+  }
+
+  /* Loading placeholder — a subtle sweeping tint. */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-sunken) 25%,
+      var(--color-line) 37%,
+      var(--color-surface-sunken) 63%
+    );
+    background-size: 400% 100%;
+    animation: skeleton-sweep 1.4s ease-in-out infinite;
+  }
+  @keyframes skeleton-sweep {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: 0 0;
+    }
+  }
+
+  /* Public progress bar fills in on mount — no `to`, so it animates up to
+     whatever width the element already has (the real raised/goal %).
+     `prefers-reduced-motion` (above) freezes this like every other animation. */
+  @keyframes progress-fill {
+    from {
+      width: 0;
+    }
+  }
+  .animate-progress-fill {
+    animation: progress-fill var(--duration-slow) var(--ease-out) both;
+  }
+
+  /* Org-switcher popover (PanelSidebar, a native <details>) fades + slides in on
+     open instead of snapping. @starting-style covers the display:none → visible
+     jump; reduced-motion above still collapses the transition to ~0. */
+  details[open] > .org-switcher-popover {
+    transition:
+      opacity var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
+  }
+  @starting-style {
+    details[open] > .org-switcher-popover {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+  }
+
+  .card {
+    @apply rounded-xl border border-line bg-surface;
+  }
+
+  .label {
+    @apply text-[0.8125rem] font-medium text-ink;
+  }
+  .hint {
+    @apply text-xs text-muted;
+  }
+  .field-error {
+    @apply text-xs text-danger;
+  }
+
+  .link {
+    @apply font-medium text-brand-600 underline decoration-brand-600/25 underline-offset-2 hover:decoration-brand-600;
+  }
+
+  .badge-neutral {
+    @apply badge border-line-strong bg-canvas text-muted;
+  }
+  .badge-info {
+    @apply badge bg-info-bg text-info;
+  }
+  .badge-success {
+    @apply badge bg-success-bg;
+    color: var(--color-success-text);
+  }
+  .badge-warn {
+    @apply badge bg-warn-bg;
+    color: var(--color-warn-text);
+  }
+  .badge-danger {
+    @apply badge bg-danger-bg text-danger;
+  }
+
+  .th {
+    @apply px-4 py-2.5 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-faint;
+  }
+  .td {
+    @apply px-4 py-3 text-sm;
+  }
+}

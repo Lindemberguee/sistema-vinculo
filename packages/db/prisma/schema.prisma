@@ -1,0 +1,1473 @@
+// Donation SaaS — data model.
+// Conventions:
+//   * Every domain table carries `organizationId`; never query without it (see tenantPrisma).
+//   * All money is integer BRL cents. No Float, no Decimal for money.
+//   * `cuid()` ids everywhere.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Pooled connection for the app (Neon PgBouncer — needs ?pgbouncer=true).
+  url       = env("DATABASE_URL")
+  // Direct connection for `prisma migrate` / introspection. Falls back to url
+  // when unset (e.g. local Docker Postgres).
+  directUrl = env("DIRECT_URL")
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum OrgStatus {
+  PENDING_KYC
+  ACTIVE
+  SUSPENDED
+}
+
+enum KycStatus {
+  NOT_STARTED
+  SUBMITTED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  FINANCE
+  EDITOR
+  VIEWER
+}
+
+enum CampaignType {
+  DONATION
+  CROWDFUNDING
+  APADRINHAMENTO
+  EVENT
+}
+
+/// Used for the (future) public directory filter and reporting — purely descriptive.
+enum CampaignCategory {
+  NONE
+  CHILDREN
+  HEALTH
+  ENVIRONMENT
+  HUMAN_RIGHTS
+  ANIMALS
+  EDUCATION
+  SPORTS
+  COMMUNITY
+  ENTREPRENEURSHIP
+  SPIRITUALITY
+  CULTURE
+  PUBLIC_POLICY
+}
+
+enum CampaignStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  CLOSED
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+  BOLETO
+}
+
+/// Donation lifecycle. Aggregates on Campaign/Donor change only on
+/// transitions INTO and OUT OF PAID, inside one DB transaction.
+enum DonationStatus {
+  CREATED
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  REFUNDED
+  CHARGED_BACK
+}
+
+enum RecurringInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum PayoutStatus {
+  PENDING
+  IN_TRANSIT
+  PAID
+  FAILED
+}
+
+enum SponseeStatus {
+  AVAILABLE
+  SPONSORED
+  RETIRED
+}
+
+enum RaffleStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  DRAWN
+  CANCELED
+}
+
+enum RaffleTicketStatus {
+  RESERVED
+  PAID
+  RELEASED
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ENDED
+  CANCELED
+}
+
+enum EventTicketStatus {
+  RESERVED
+  VALID
+  USED
+  REFUNDED
+}
+
+enum AuctionStatus {
+  DRAFT
+  OPEN
+  ENDED
+  SETTLED
+  CANCELED
+}
+
+enum LotStatus {
+  ACTIVE
+  SOLD
+  UNSOLD
+}
+
+enum DomainSslStatus {
+  PENDING
+  ISSUED
+  FAILED
+}
+
+enum DonationLinkStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum AmbassadorStatus {
+  ACTIVE
+  HIDDEN
+  BLOCKED
+}
+
+enum PaymentProvider {
+  PAGARME
+  MERCADOPAGO
+  ASAAS
+  STRIPE
+}
+
+/// CONNECTED = the org brought its own gateway account (BYOG); we never touch
+/// the money, revenue is the monthly plan. MANAGED = platform-as-facilitator
+/// with split (needs a marketplace-enabled platform account).
+enum PaymentMode {
+  CONNECTED
+  MANAGED
+}
+
+// ─────────────────────── Tenancy & access ────────────────────────
+
+model Organization {
+  id                 String    @id @default(cuid())
+  slug               String    @unique // subdomain: {slug}.APP_BASE_DOMAIN
+  legalName          String
+  displayName        String
+  cnpj               String    @unique
+  status             OrgStatus @default(PENDING_KYC)
+  kycStatus          KycStatus @default(NOT_STARTED)
+  /// Pagar.me recipient id (rp_...) that receives the org's net split.
+  gatewayRecipientId String?
+  /// { logoUrl, primaryColor, secondaryColor, accentColor, fontFamily }
+  branding           Json      @default("{}")
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  memberships   Membership[]
+  invitations   Invitation[]
+  campaigns     Campaign[]
+  pages         Page[]
+  donors        Donor[]
+  donations     Donation[]
+  recurring     RecurringPlan[]
+  customDomains CustomDomain[]
+  subscription  Subscription?
+  paymentConfig OrganizationPaymentConfig?
+  payouts          Payout[]
+  kyc              OrganizationKyc?
+  kycDocuments     KycDocument[]
+  exports          Export[]
+  outboundWebhooks OutboundWebhook[]
+  sponsees         Sponsee[]
+  raffles          Raffle[]
+  events           Event[]
+  auctions         Auction[]
+  donationLinks    DonationLink[]
+  ambassadors      CampaignAmbassador[]
+  auditLogs        AuditLog[]
+  donorNotes       DonorNote[]
+  donorTasks       DonorTask[]
+  donorSegments    DonorSegment[]
+  donorBroadcasts  DonorBroadcast[]
+  emailConfig      OrganizationEmailConfig?
+  donorEmailStatuses DonorEmailStatus[]
+  emailTemplates   EmailTemplate[]
+  segmentAutomations SegmentAutomation[]
+  notificationConfig OrganizationNotificationConfig?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+/// PII collected during onboarding, kept off the hot Organization row.
+model OrganizationKyc {
+  organizationId    String       @id
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactEmail      String
+  contactPhone      String
+  /// { street, number, neighborhood, city, state, zipCode }
+  address           Json
+  legalRepName      String
+  legalRepDocument  String // CPF, digits only
+  /// { bankCode, branchNumber, accountNumber, accountCheckDigit, type }
+  bankAccount       Json
+  acceptedTermsAt   DateTime?
+  submittedAt       DateTime?
+  rejectionReason   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// The org's connected payment gateway (BYOG). One per org. The secret key is
+/// stored envelope-encrypted (AES-256-GCM) and never leaves the server.
+model OrganizationPaymentConfig {
+  organizationId String          @id
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       PaymentProvider
+  mode           PaymentMode     @default(CONNECTED)
+  /// AES-256-GCM: iv(12) || authTag(16) || ciphertext. Decrypted only to build a gateway client.
+  secretKeyEnc   Bytes
+  /// Publishable key — safe for the browser (card tokenization).
+  publicKey      String
+  /// Per-org webhook auth secret we generate; the org pastes it into their gateway.
+  webhookSecret  String
+  /// Last successful authenticated probe against the provider.
+  verifiedAt     DateTime?
+  /// { pix: bool, credit_card: bool, boleto: bool } — detected on connect.
+  capabilities   Json            @default("{}")
+  createdBy      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String
+  passwordHash  String?
+  image         String?
+
+  memberships Membership[]
+  accounts    Account[]
+  sessions    Session[]
+  donorNotes         DonorNote[]
+  donorTasksAssigned DonorTask[] @relation("DonorTaskAssignee")
+  donorTasksCreated  DonorTask[] @relation("DonorTaskCreator")
+  donorsOwned        Donor[]     @relation("DonorOwner")
+  donorSegments      DonorSegment[]
+  donorBroadcasts    DonorBroadcast[]
+  emailTemplatesUpdated EmailTemplate[]
+  segmentAutomations SegmentAutomation[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// ── Auth.js (next-auth) adapter tables ───────────────
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// A pending invitation for someone to join an organization with a given role.
+/// `token` is the unguessable accept link. One pending invite per (org, email).
+model Invitation {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email           String // lowercased
+  role            Role         @default(VIEWER)
+  token           String       @unique @default(cuid())
+  invitedByUserId String?
+  createdAt       DateTime     @default(now())
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+
+  @@unique([organizationId, email])
+  @@index([email])
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           Role         @default(VIEWER)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model CustomDomain {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  host           String          @unique
+  verificationToken String
+  verifiedAt     DateTime?
+  sslStatus      DomainSslStatus @default(PENDING)
+  createdAt      DateTime        @default(now())
+
+  @@index([organizationId])
+}
+
+// ──────────────── Platform plans & billing ───────────────────────
+
+model Plan {
+  id                     String  @id // free | essencial | pro | enterprise
+  name                   String
+  monthlyCents           Int     @default(0)
+  /// Platform fee in basis points (490 = 4.90%). Applied per paid donation.
+  platformFeeBps         Int
+  platformFeeFixedCents  Int     @default(0)
+  /// { maxCampaigns, maxUsers, customDomain: bool, removeBranding: bool, modules: string[] }
+  limits                 Json    @default("{}")
+  isPublic               Boolean @default(true)
+
+  organizations Organization[]
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                    String             @id @default(cuid())
+  organizationId        String             @unique
+  organization          Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId                String
+  plan                  Plan               @relation(fields: [planId], references: [id])
+  status                SubscriptionStatus @default(TRIALING)
+  currentPeriodEnd      DateTime
+  lastPaidAt            DateTime?
+  gatewaySubscriptionId String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+}
+
+// ──────────────────── Campaigns & pages ──────────────────────────
+
+model Campaign {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  slug           String
+  title          String
+  slogan         String?
+  category       CampaignCategory @default(NONE)
+  summary        String?
+  /// Narrative ("a história"), sanitized HTML — see apps/web/src/blocks/sanitize.ts.
+  story          String?
+  storyUpdatedAt DateTime?
+  /// [{ type: "image"|"video", url }], up to 6.
+  galleryMedia   Json           @default("[]")
+  type           CampaignType   @default(DONATION)
+  goalCents      Int?
+  /// Stretch goal shown once the main goal is hit.
+  superGoalCents Int?
+  minAmountCents Int            @default(500)
+  suggestedAmountsCents Int[]   @default([2000, 5000, 10000, 25000])
+  allowRecurring Boolean        @default(true)
+  allowTip       Boolean        @default(true)
+  coverImageUrl  String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  status         CampaignStatus @default(DRAFT)
+
+  /// Donations the org received outside the platform, folded into the public total.
+  offPlatformCents    Int      @default(0)
+  notifyEmails        String[] @default([])
+  /// Stays reachable by direct link; just excluded from any public directory listing.
+  hiddenFromDirectory Boolean  @default(false)
+  /// Donor can dedicate the donation to someone (checkout field).
+  dedicationEnabled   Boolean  @default(false)
+  /// Anyone can create a fundraising page for this campaign (p2p — Phase G).
+  allowAmbassadors    Boolean  @default(false)
+
+  /// [{ q, a }] — shown on the page when showFaq.
+  faq         Json    @default("[]")
+  showFaq     Boolean @default(true)
+  showUpdates Boolean @default(true)
+
+  /// Impact metadata (used by the directory filter + impact reports).
+  sdgGoals     Int[]   @default([]) // UN SDG numbers 1..17
+  impactBiome  String?
+  impactFocus  String?
+  /// [{ label, amountCents }] — "para onde vai o dinheiro".
+  budget       Json    @default("[]")
+  showBudget   Boolean @default(false)
+
+  // Denormalized aggregates — updated in the same tx as the paid donation.
+  raisedCents Int @default(0)
+  donorsCount Int @default(0)
+
+  /// { title, description, ogImageUrl, noindex }
+  seo Json @default("{}")
+
+  page      Page?
+  donations Donation[]
+  recurring RecurringPlan[]
+  options   DonationOption[]
+  sponsees  Sponsee[]
+  raffles   Raffle[]
+  events    Event[]
+  auctions  Auction[]
+  updates   CampaignUpdate[]
+  reports   CampaignReport[]
+  rewards   CampaignReward[]
+  donationLinks DonationLink[]
+  ambassadors   CampaignAmbassador[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, status])
+}
+
+/// A trackable, shareable donation link that opens a campaign's checkout with
+/// optional presets (amount, recurrence) and UTM attribution. Metrics are
+/// denormalized counters bumped in the same tx as the paid/reversed donation.
+model DonationLink {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaignId     String
+  campaign       Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  /// Short code in the public URL /l/{slug}. Globally unique, [2-9a-z] only.
+  slug           String             @unique
+  /// Internal label ("Bio do Instagram", "Lista de e-mail — março").
+  title          String
+  note           String?
+
+  // Checkout presets — all optional; a bare link only adds tracking.
+  amountCents           Int?
+  suggestedAmountsCents  Int[]   @default([])
+  lockAmount            Boolean @default(false)
+  defaultRecurring      Boolean @default(false)
+  defaultCoverFee       Boolean @default(false)
+
+  // Attribution — copied into Donation.metadata and used for reporting.
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+
+  status    DonationLinkStatus @default(ACTIVE)
+  expiresAt DateTime?
+
+  // Denormalized metrics.
+  visits         Int @default(0)
+  donationsCount Int @default(0)
+  raisedCents    Int @default(0)
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  donations Donation[]
+
+  @@index([organizationId, campaignId])
+  @@index([campaignId, status])
+}
+
+/// A supporter running their own peer-to-peer fundraising page for a campaign
+/// (only when Campaign.allowAmbassadors). Created self-service from the public
+/// site; `manageToken` is the unguessable edit link. Metrics are denormalized
+/// counters bumped in the same tx as the paid/reversed donation.
+model CampaignAmbassador {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaignId     String
+  campaign       Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  /// Public URL: /embaixador/{slug}. Globally unique.
+  slug           String           @unique
+  name           String
+  email          String
+  photoUrl       String?
+  /// Short personal appeal headline, plain text.
+  headline       String?
+  /// Longer personal message, plain text (rendered with whitespace preserved).
+  message        String?
+  goalCents      Int?
+  status         AmbassadorStatus @default(ACTIVE)
+  /// Unguessable token for the supporter's self-service manage link.
+  manageToken    String           @unique @default(cuid())
+  /// null = created self-service; otherwise the panel user id.
+  createdBy      String?
+
+  // Denormalized metrics.
+  donationsCount Int @default(0)
+  raisedCents    Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  donations Donation[]
+
+  @@index([campaignId, status])
+  @@index([organizationId, campaignId])
+}
+
+/// A donation tier ("cota") with an optional reward / tangible impact and an
+/// optional limited quantity. `claimed` bumps when a donation on this reward
+/// is PAID (soft counter — a rare oversell of a perk is acceptable).
+model CampaignReward {
+  id             String   @id @default(cuid())
+  campaignId     String
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  organizationId String
+  title          String
+  description    String?
+  imageUrl       String?
+  amountCents    Int
+  quantity       Int? // null = unlimited
+  claimed        Int      @default(0)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  donations Donation[]
+
+  @@index([campaignId, sortOrder])
+}
+
+/// "Prestação de contas" — a link to a report showing how the money was used.
+model CampaignReport {
+  id             String   @id @default(cuid())
+  campaignId     String
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  organizationId String
+  title          String
+  url            String
+  publishedAt    DateTime @default(now())
+
+  @@index([campaignId, publishedAt])
+}
+
+/// A "Novidade" (News) post on a campaign; notifies its donors by e-mail.
+model CampaignUpdate {
+  id             String       @id @default(cuid())
+  campaignId     String
+  campaign       Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  organizationId String // denorm for tenant scoping
+  title          String
+  /// Sanitized HTML — see apps/web/src/blocks/sanitize.ts.
+  body           String
+  createdBy      String
+  publishedAt    DateTime  @default(now())
+  notifiedAt     DateTime?
+
+  @@index([campaignId, publishedAt])
+}
+
+model Page {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// null => the org's institutional landing page
+  campaignId     String?      @unique
+  campaign       Campaign?    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  /// Draft blocks (Block[] validated by @donation/blocks Zod schema).
+  blocks          Json  @default("[]")
+  /// Live blocks served to the public. null until first publish.
+  publishedBlocks Json?
+  publishedAt     DateTime?
+
+  versions PageVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model PageVersion {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  blocks    Json
+  createdBy String
+  createdAt DateTime @default(now())
+
+  @@index([pageId, createdAt])
+}
+
+model DonationOption {
+  id           String   @id @default(cuid())
+  campaignId   String
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  amountCents  Int
+  label        String
+  impactText   String?
+  recurringOnly Boolean @default(false)
+  sortOrder    Int      @default(0)
+
+  @@index([campaignId])
+}
+
+// ─────────────────────── Donors (CRM) ────────────────────────────
+
+model Donor {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  name           String
+  /// SHA-256 of normalized CPF/CNPJ for dedupe. Raw doc is stored
+  /// encrypted in `documentEnc` (pgcrypto / envelope), never in plaintext.
+  documentHash   String?
+  documentEnc    Bytes?
+  phone          String?
+  address        Json?
+  birthdate      DateTime?
+
+  /// Relationship manager (a Membership user of this org). SetNull if they leave.
+  ownerUserId    String?
+  owner          User?               @relation("DonorOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  preferredChannel DonorContactChannel?
+
+  // RFM aggregates — maintained on paid/refunded donations + nightly job.
+  totalDonatedCents Int       @default(0)
+  donationsCount    Int       @default(0)
+  firstDonationAt   DateTime?
+  lastDonationAt    DateTime?
+  rfmSegment        String?
+
+  /// { email: bool, whatsapp: bool, at: ISO, source: string, ip: string }
+  consent Json @default("{}")
+
+  donations Donation[]
+  recurring RecurringPlan[]
+  tags      DonorTag[]
+  notes     DonorNote[]
+  tasks     DonorTask[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, email])
+  @@index([organizationId, lastDonationAt])
+  @@index([organizationId, ownerUserId])
+}
+
+model DonorTag {
+  id      String @id @default(cuid())
+  donorId String
+  donor   Donor  @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  tag     String
+
+  @@unique([donorId, tag])
+  @@index([tag])
+}
+
+enum DonorContactChannel {
+  EMAIL
+  WHATSAPP
+  PHONE
+  SMS
+}
+
+/// Manual interaction / note on the donor timeline.
+enum DonorActivityKind {
+  NOTE
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  OTHER
+}
+
+model DonorNote {
+  id              String            @id @default(cuid())
+  organizationId  String
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  donorId         String
+  donor           Donor             @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  kind            DonorActivityKind @default(NOTE)
+  body            String
+  /// When the interaction happened (CALL/MEETING/…). Same as createdAt for plain notes.
+  happenedAt      DateTime          @default(now())
+  pinned          Boolean           @default(false)
+  createdByUserId String?
+  createdBy       User?             @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([donorId, happenedAt])
+  @@index([organizationId, createdAt])
+}
+
+enum BroadcastStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+}
+
+enum EmailDomainStatus {
+  NONE
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+/// Per-org sender identity + optional own sending domain (verified via provider API).
+model OrganizationEmailConfig {
+  organizationId   String            @id
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Display name in the From header. Defaults to Organization.displayName.
+  fromName         String?
+  /// Reply-To address. Defaults to the KYC contact e-mail.
+  replyTo          String?
+  /// Own sending subdomain, e.g. "mail.institutox.org.br".
+  sendingDomain    String?
+  /// Provider (Resend) domain id, for verification polling.
+  providerDomainId String?
+  domainStatus     EmailDomainStatus @default(NONE)
+  /// DNS records the org must publish (array of { type, name, value, priority? }).
+  dnsRecords       Json?
+  verifiedAt       DateTime?
+  /// Logo shown at the top of e-mails that use the default shell.
+  logoUrl          String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+enum EmailTemplateKind {
+  DONATION_THANKS
+  EVENT_TICKETS
+  EVENT_REMINDER
+  RAFFLE_RESULT
+  RAFFLE_WINNER
+  AUCTION_OUTBID
+  AUCTION_WON
+  AUCTION_PAYMENT_REMINDER
+  PIX_INSTRUCTIONS
+  BOLETO_INSTRUCTIONS
+  DUNNING
+  DONATION_DECLINED
+  DONATION_REFUNDED
+  SUBSCRIPTION_CANCELED
+  WELCOME
+  BIRTHDAY
+  RECURRING_REMINDER
+  WINBACK
+  AMBASSADOR_WELCOME
+  ANNUAL_STATEMENT
+}
+
+/// Per-org override of a transactional/relationship e-mail. Absent = platform default.
+model EmailTemplate {
+  id              String            @id @default(cuid())
+  organizationId  String
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  kind            EmailTemplateKind
+  locale          String            @default("pt-BR")
+  subject         String
+  /// Compiled HTML body (from `blocksJson`) — what the send path renders.
+  bodyHtml        String
+  /// Editable block list authored in the e-mail builder. Null on legacy rows.
+  blocksJson      Json?
+  /// For the optional relationship recipes (BIRTHDAY, RECURRING_REMINDER).
+  enabled         Boolean           @default(true)
+  updatedByUserId String?
+  updatedBy       User?             @relation(fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([organizationId, kind, locale])
+}
+
+/// Suppression list — a donor address we must not e-mail (bounce / complaint / unsubscribe).
+model DonorEmailStatus {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  /// BOUNCED | COMPLAINED | UNSUBSCRIBED
+  status         String
+  reason         String?
+  at             DateTime     @default(now())
+
+  @@unique([organizationId, email])
+  @@index([organizationId, status])
+}
+
+/// A one-off e-mail sent to every donor matching a filter snapshot.
+model DonorBroadcast {
+  id              String          @id @default(cuid())
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String?
+  subject         String
+  bodyText        String
+  /// Snapshot of the Doadores list filters (query-param object) at send time.
+  filters         Json
+  status          BroadcastStatus @default(DRAFT)
+  /// When set + status SCHEDULED, the worker dispatches it at this time.
+  scheduledAt     DateTime?
+  recipientCount  Int             @default(0)
+  sentCount       Int             @default(0)
+  skippedCount    Int             @default(0)
+  error           String?
+  createdByUserId String?
+  createdBy       User?           @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  sentAt          DateTime?
+  recipients      BroadcastRecipient[]
+
+  @@index([organizationId, createdAt])
+  @@index([status, scheduledAt])
+}
+
+enum BroadcastRecipientStatus {
+  QUEUED
+  SENT
+  SKIPPED_SUPPRESSED
+  SKIPPED_DUPLICATE
+  FAILED
+}
+
+/// One row per donor a broadcast fan-out touched — the per-message delivery trail.
+/// (EmailLog stays the cross-message dedup; the SENT rows here overlap on purpose.)
+model BroadcastRecipient {
+  id             String                   @id @default(cuid())
+  broadcastId    String
+  broadcast      DonorBroadcast           @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  organizationId String
+  donorId        String
+  email          String
+  status         BroadcastRecipientStatus @default(QUEUED)
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime                 @default(now())
+
+  @@unique([broadcastId, donorId])
+  @@index([broadcastId, status])
+  @@index([organizationId, donorId])
+}
+
+/// A named, reusable donor filter (saved from the Doadores list).
+model DonorSegment {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  /// Serialized query-param object of the Doadores list filters.
+  filters         Json
+  createdByUserId String?
+  createdBy       User?        @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  automations     SegmentAutomation[]
+  memberships     SegmentMembership[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, createdAt])
+}
+
+/// "Quando o doador entra no segmento X, enviar o template Y após N dias."
+model SegmentAutomation {
+  id              String            @id @default(cuid())
+  organizationId  String
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  segmentId       String
+  segment         DonorSegment      @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  templateKind    EmailTemplateKind
+  delayDays       Int               @default(0)
+  enabled         Boolean           @default(true)
+  name            String?
+  sentCount       Int               @default(0)
+  createdByUserId String?
+  createdBy       User?             @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([organizationId])
+}
+
+/// Snapshot of which donors are currently in a segment + when they entered
+/// (so a delayed trigger fires N days after entry). Reconciled daily.
+model SegmentMembership {
+  id        String       @id @default(cuid())
+  segmentId String
+  segment   DonorSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  donorId   String
+  enteredAt DateTime     @default(now())
+
+  @@unique([segmentId, donorId])
+  @@index([segmentId, enteredAt])
+}
+
+/// Internal alerts for the org's own team (not the donors).
+model OrganizationNotificationConfig {
+  organizationId  String       @id
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipients      String[]
+  kycChanges      Boolean      @default(true)
+  recurringFailed Boolean      @default(true)
+  dailyDigest     Boolean      @default(false)
+  digestHour      Int          @default(9)
+  updatedAt       DateTime     @updatedAt
+}
+
+model DonorTask {
+  id              String    @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  donorId         String
+  donor           Donor     @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  title           String
+  details         String?
+  dueAt           DateTime?
+  doneAt          DateTime?
+  assigneeUserId  String?
+  assignee        User?     @relation("DonorTaskAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+  createdByUserId String?
+  createdBy       User?     @relation("DonorTaskCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([organizationId, doneAt, dueAt])
+  @@index([assigneeUserId, doneAt])
+  @@index([donorId])
+}
+
+// ─────────────────── Donations & money ───────────────────────────
+
+model Donation {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaignId     String?
+  campaign       Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  donorId        String
+  donor          Donor          @relation(fields: [donorId], references: [id])
+  recurringPlanId String?
+  recurringPlan  RecurringPlan? @relation(fields: [recurringPlanId], references: [id])
+  /// Set when the donor picked a campaign reward ("cota").
+  rewardId       String?
+  reward         CampaignReward? @relation(fields: [rewardId], references: [id], onDelete: SetNull)
+  /// Set when the donation came through a trackable donation link (/l/{slug}).
+  donationLinkId String?
+  donationLink   DonationLink?  @relation(fields: [donationLinkId], references: [id], onDelete: SetNull)
+  /// Set when the donation came through an ambassador's page (/embaixador/{slug}).
+  ambassadorId   String?
+  ambassador     CampaignAmbassador? @relation(fields: [ambassadorId], references: [id], onDelete: SetNull)
+
+  /// ISO-4217. When != BRL the amounts below are minor units of this currency
+  /// and the payment ran through the international gateway (Stripe).
+  currency         String @default("BRL")
+  amountCents      Int // gross amount the donor pays (excludes tip)
+  tipCents         Int @default(0) // optional "cover the fee" tip
+  platformFeeCents Int // our split
+  gatewayFeeCents  Int @default(0) // Pagar.me fee, filled from webhook
+  netToOrgCents    Int // amountCents + tipCents - platformFeeCents
+
+  method    PaymentMethod
+  status    DonationStatus @default(CREATED)
+  anonymous Boolean        @default(false)
+  message   String?
+  /// "Dedico esta doação a …" (when the campaign enables it).
+  dedicationTo      String?
+  dedicationMessage String?
+
+  gatewayOrderId  String? @unique
+  gatewayChargeId String? @unique
+  /// Pix: { qrCode, qrCodeUrl, expiresAt } | Boleto: { line, pdfUrl, dueAt }
+  paymentDetails  Json?
+
+  paidAt     DateTime?
+  refundedAt DateTime?
+
+  /// { utmSource, utmMedium, utmCampaign, referrer, checkoutBlockId }
+  metadata Json @default("{}")
+
+  raffleTickets RaffleTicket[]
+  eventTickets  EventTicket[]
+  lots          Lot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status, createdAt])
+  @@index([campaignId, status])
+  @@index([donorId])
+  @@index([donationLinkId])
+  @@index([ambassadorId])
+}
+
+model RecurringPlan {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  donorId        String
+  donor          Donor             @relation(fields: [donorId], references: [id])
+  campaignId     String?
+  campaign       Campaign?         @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  /// Set when this recurrence is an "apadrinhamento" earmarked to a sponsee.
+  sponseeId      String?
+  sponsee        Sponsee?          @relation(fields: [sponseeId], references: [id], onDelete: SetNull)
+
+  amountCents Int
+  tipCents    Int               @default(0) // donor opted to cover the platform fee each cycle
+  method      PaymentMethod // CREDIT_CARD => Pagar.me subscription; PIX => our scheduled QR job
+  interval    RecurringInterval @default(MONTHLY)
+  status      RecurringStatus   @default(ACTIVE)
+
+  gatewaySubscriptionId String?
+  nextChargeAt          DateTime
+  lastAttemptAt         DateTime?
+  failedAttempts        Int       @default(0)
+  canceledAt            DateTime?
+  /// Trackable donation link this recurrence started from — copied onto each
+  /// Donation the subscription generates, so link metrics stay accurate.
+  donationLinkId        String?
+  /// Ambassador page this recurrence started from — copied onto each generated
+  /// Donation so ambassador metrics stay accurate.
+  ambassadorId          String?
+  /// Unguessable token for the donor's self-service manage/cancel link.
+  cancelToken           String    @unique @default(cuid())
+
+  donations Donation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status])
+  @@index([status, nextChargeAt])
+  @@index([sponseeId])
+}
+
+/// Apadrinhamento — a child / animal / project a donor sponsors monthly.
+model Sponsee {
+  id                String        @id @default(cuid())
+  organizationId    String
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaignId        String?
+  campaign          Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  name              String
+  category          String // "Criança" | "Animal" | "Idoso" | "Projeto" | ...
+  story             String
+  photoUrl          String?
+  birthYear         Int?
+  monthlyAmountCents Int
+  status            SponseeStatus @default(AVAILABLE)
+  /// Current sponsor (the donor behind the active recurrence).
+  sponsorDonorId    String?
+  sponsoredAt       DateTime?
+
+  recurringPlans RecurringPlan[]
+  updates        SponseeUpdate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status])
+  @@index([campaignId])
+}
+
+model SponseeUpdate {
+  id        String   @id @default(cuid())
+  sponseeId String
+  sponsee   Sponsee  @relation(fields: [sponseeId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  photoUrl  String?
+  createdBy String
+  createdAt DateTime @default(now())
+
+  @@index([sponseeId, createdAt])
+}
+
+/// Rifa — numbered tickets sold for a prize draw.
+model Raffle {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaignId       String?
+  campaign         Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  title            String
+  description      String
+  prize            String
+  ticketPriceCents Int
+  totalNumbers     Int // numbers run 1..totalNumbers
+  minPerPurchase   Int          @default(1)
+  maxPerPurchase   Int          @default(50)
+  drawAt           DateTime?
+  status           RaffleStatus @default(DRAFT)
+
+  // Draw result (auditable: idx = sha256(drawSeed) mod paidCount, tickets sorted by number)
+  drawSeed         String?
+  drawnNumber      Int?
+  winnerTicketId   String?
+  drawnAt          DateTime?
+
+  tickets   RaffleTicket[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([organizationId, status])
+}
+
+model RaffleTicket {
+  id             String             @id @default(cuid())
+  raffleId       String
+  raffle         Raffle             @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  organizationId String // denormalized for tenant scoping
+  number         Int
+  status         RaffleTicketStatus @default(RESERVED)
+  donorId        String?
+  /// The Donation that pays for this batch of tickets.
+  donationId     String?
+  donation       Donation?          @relation(fields: [donationId], references: [id], onDelete: SetNull)
+  reservedAt     DateTime           @default(now())
+  paidAt         DateTime?
+
+  @@unique([raffleId, number])
+  @@index([raffleId, status])
+  @@index([donationId])
+}
+
+/// Evento com ingressos e check-in.
+model Event {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaignId     String?
+  campaign       Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String
+  venue       String
+  address     String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  status      EventStatus @default(DRAFT)
+
+  ticketTypes EventTicketType[]
+  tickets     EventTicket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status])
+}
+
+model EventTicketType {
+  id             String  @id @default(cuid())
+  eventId        String
+  event          Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organizationId String // denorm
+  name           String
+  priceCents     Int
+  quantity       Int
+  /// Atomic sold counter (RESERVED + VALID + USED). Availability = quantity - sold.
+  sold           Int     @default(0)
+  maxPerOrder    Int     @default(6)
+  sortOrder      Int     @default(0)
+
+  tickets EventTicket[]
+
+  @@index([eventId])
+}
+
+model EventTicket {
+  id             String            @id @default(cuid())
+  eventId        String
+  event          Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketTypeId   String
+  ticketType     EventTicketType   @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  organizationId String // denorm
+  donorId        String?
+  donationId     String?
+  donation       Donation?         @relation(fields: [donationId], references: [id], onDelete: SetNull)
+  status         EventTicketStatus @default(RESERVED)
+  /// Unguessable code carried in the QR for check-in.
+  code           String            @unique @default(cuid())
+  attendeeName   String?
+  checkedInAt    DateTime?
+  checkedInBy    String?
+  createdAt      DateTime          @default(now())
+
+  @@index([eventId, status])
+  @@index([donationId])
+  @@index([ticketTypeId, status])
+}
+
+/// Leilão beneficente — lotes com lances; o vencedor paga ao fim.
+model Auction {
+  id               String        @id @default(cuid())
+  organizationId   String
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaignId       String?
+  campaign         Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  title            String
+  description      String
+  status           AuctionStatus @default(DRAFT)
+  /// A bid within this many seconds of a lot's end pushes the end out.
+  antiSnipeSeconds Int           @default(120)
+
+  lots      Lot[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status])
+}
+
+model Lot {
+  id                  String    @id @default(cuid())
+  auctionId           String
+  auction             Auction   @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  organizationId      String // denorm
+  title               String
+  description         String
+  photoUrl            String?
+  startPriceCents     Int
+  minIncrementCents   Int
+  endsAt              DateTime
+  status              LotStatus @default(ACTIVE)
+
+  currentBidCents      Int?
+  currentBidderDonorId String?
+  bidCount             Int      @default(0)
+
+  winnerDonorId  String?
+  winningBidCents Int?
+  donationId     String?
+  donation       Donation? @relation(fields: [donationId], references: [id], onDelete: SetNull)
+  settledAt      DateTime?
+
+  bids      Bid[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([auctionId])
+  @@index([status, endsAt])
+}
+
+model Bid {
+  id             String   @id @default(cuid())
+  lotId          String
+  lot            Lot      @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  organizationId String // denorm
+  donorId        String
+  amountCents    Int
+  outbid         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([lotId, createdAt])
+  @@index([donorId])
+}
+
+/// Webhook idempotency + audit. Insert with ON CONFLICT DO NOTHING;
+/// if the row already exists, the event was already accepted.
+model GatewayEvent {
+  id          String    @id // event id from Pagar.me
+  type        String
+  payload     Json
+  processedAt DateTime?
+  error       String?
+  attempts    Int       @default(0)
+  receivedAt  DateTime  @default(now())
+
+  @@index([type, processedAt])
+}
+
+model Payout {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amountCents       Int
+  status            PayoutStatus @default(PENDING)
+  gatewayTransferId String?
+  paidAt            DateTime?
+  createdAt         DateTime     @default(now())
+
+  @@index([organizationId, status])
+}
+
+model KycDocument {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  kind           String // ESTATUTO | ATA | CARTAO_CNPJ | DOC_RESPONSAVEL | COMPROVANTE_BANCARIO
+  storageKey     String // private S3 key; access only via short-lived signed URL
+  contentType    String
+  sizeBytes      Int
+  uploadedBy     String
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, kind])
+}
+
+/// Outgoing webhooks so an org can pipe events into their own CRM / Zapier / sheet.
+model OutboundWebhook {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  url            String
+  /// Shared secret; deliveries are signed HMAC-SHA256 over the raw body.
+  secret         String
+  /// Event names this endpoint subscribes to, e.g. ["donation.paid","recurring.canceled"].
+  events         String[]
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  deliveries WebhookDelivery[]
+
+  @@index([organizationId])
+}
+
+model WebhookDelivery {
+  id             String          @id @default(cuid())
+  webhookId      String
+  webhook        OutboundWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  organizationId String
+  event          String
+  payload        Json
+  status         String          @default("PENDING") // PENDING | DELIVERED | FAILED
+  attempts       Int             @default(0)
+  responseCode   Int?
+  lastError      String?
+  createdAt      DateTime        @default(now())
+  deliveredAt    DateTime?
+
+  @@index([organizationId, createdAt])
+  @@index([webhookId, status])
+}
+
+/// Dedupe for lifecycle e-mails (welcome, win-back, …).
+model EmailLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  donorId        String?
+  kind           String // "welcome" | "winback" | "recurring_reminder" | ...
+  sentAt         DateTime @default(now())
+
+  @@unique([donorId, kind])
+  @@index([organizationId, kind, sentAt])
+}
+
+/// Async CSV exports (donors / donations). Built by the worker, never in a request.
+model Export {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  kind           String // "donors" | "donations"
+  status         String       @default("PENDING") // PENDING | PROCESSING | DONE | FAILED
+  filters        Json         @default("{}")
+  storageKey     String?
+  rowCount       Int?
+  error          String?
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  completedAt    DateTime?
+
+  @@index([organizationId, createdAt])
+}
+
+model AuditLog {
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  userId         String?
+  action         String // donation.paid | page.published | org.bank_changed | plan.changed | user.invited ...
+  entity         String
+  entityId       String
+  diff           Json          @default("{}")
+  ip             String?
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([entity, entityId])
+}

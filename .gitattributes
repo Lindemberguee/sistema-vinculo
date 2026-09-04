@@ -1,0 +1,14 @@
+# Normalize line endings to LF in the repo; Git still checks out CRLF on
+# Windows for text files unless overridden below, so diffs stay stable
+# across contributors on different OSes.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.pdf binary

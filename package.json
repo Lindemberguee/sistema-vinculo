@@ -1,0 +1,30 @@
+{
+  "name": "donation-saas",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "lint:tokens": "node scripts/check-tokens.mjs",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "check": "pnpm typecheck && pnpm test && pnpm lint:tokens",
+    "db:generate": "pnpm --filter @donation/db generate",
+    "db:migrate": "pnpm --filter @donation/db migrate",
+    "db:seed": "pnpm --filter @donation/db seed",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "prettier": "^3.3.3",
+    "turbo": "^2.1.3",
+    "typescript": "^5.6.2"
+  }
+}

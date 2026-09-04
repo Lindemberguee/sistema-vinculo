@@ -1,0 +1,26 @@
+{
+  "name": "@donation/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
+    "start": "dotenv -e ../../.env -- node --import tsx src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.670.0",
+    "@donation/db": "workspace:*",
+    "@donation/emails": "workspace:*",
+    "@donation/payments": "workspace:*",
+    "@donation/shared": "workspace:*",
+    "bullmq": "^5.13.2",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^7.4.2",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}

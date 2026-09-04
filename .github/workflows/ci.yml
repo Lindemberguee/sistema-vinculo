@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # dotenv-cli in the app/db scripts expects a repo-root .env
+      - name: Seed CI env file
+        run: |
+          cat > .env <<'EOF'
+          DATABASE_URL=postgresql://user:pass@localhost:5432/db
+          DIRECT_URL=postgresql://user:pass@localhost:5432/db
+          REDIS_URL=redis://localhost:6379
+          NEXTAUTH_SECRET=ci-secret-ci-secret-ci-secret
+          NEXTAUTH_URL=http://localhost:3000
+          APP_BASE_DOMAIN=localhost:3000
+          PAYMENTS_ENC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          EOF
+      - run: pnpm --filter @donation/db generate
+      - run: pnpm run typecheck
+      - run: pnpm run test
+      - run: pnpm run build

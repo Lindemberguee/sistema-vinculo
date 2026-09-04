@@ -1,0 +1,30 @@
+node_modules/
+.pnpm-store/
+dist/
+.next/
+out/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Prisma
+packages/db/prisma/*.db
+
+# AI tool configuration/cache (Claude Code, Codex, agent skill libraries) —
+# local tooling, not project source; bundles vendor fonts/schemas that don't
+# belong in this repo's history. Revisit if we want to share a curated subset
+# of .claude/rules or .claude/agents with the team later.
+.claude/
+.agents/
+.codex/
+
