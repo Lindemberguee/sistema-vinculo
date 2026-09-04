@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { LinkButton } from "@/components/ui";
+import { DonationCalculator } from "@/components/public/DonationCalculator";
 
 export const metadata: Metadata = {
   title: "Captação com clareza para o terceiro setor",
@@ -363,6 +364,8 @@ export default function MarketingHome() {
           </div>
         </div>
       </section>
+
+      <DonationCalculator />
 
       <section className="border-y border-[#dce9e2] bg-white px-5 py-20 sm:px-8 md:py-24 lg:px-10">
         <div className="mx-auto max-w-7xl">
