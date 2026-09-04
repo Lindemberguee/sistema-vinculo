@@ -27,8 +27,17 @@ export function middleware(req: NextRequest) {
   const base = BASE_DOMAIN.split(":")[0]!;
   const url = req.nextUrl.clone();
 
-  const isPanel = host === `app.${base}` || host === base;
+  // The bare/base domain is the public marketing surface at `/`. Keep the
+  // panel on the app subdomain, while preserving the existing local-dev
+  // convenience where every non-root path on localhost maps to `/panel`.
+  const isPanel = host === `app.${base}` || (host === base && url.pathname !== "/");
   const isAdmin = host === `admin.${base}`;
+
+  // Keep the root of the base domain on the marketing home. Every other
+  // surface continues through the host-based rewrites below.
+  if (host === base && url.pathname === "/") {
+    return NextResponse.next();
+  }
 
   if (isAdmin) {
     url.pathname = `/admin${url.pathname === "/" ? "" : url.pathname}`;
