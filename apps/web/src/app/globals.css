@@ -429,6 +429,35 @@
     animation: home-float 8s ease-in-out infinite;
   }
 
+  /* Above-the-fold motion is intentionally short and subtle. The global
+     reduced-motion rule below disables it for users who prefer less motion. */
+  .home-reveal {
+    animation: home-reveal 650ms var(--ease-out) both;
+  }
+  .home-reveal--1 { animation-delay: 80ms; }
+  .home-reveal--2 { animation-delay: 150ms; }
+  .home-reveal--3 { animation-delay: 220ms; }
+  .home-reveal--4 { animation-delay: 290ms; }
+  .home-reveal--5 { animation-delay: 360ms; }
+  .home-reveal--dashboard { animation: home-reveal-dashboard 800ms var(--ease-out) 180ms both; }
+
+  @keyframes home-reveal {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes home-reveal-dashboard {
+    from { opacity: 0; transform: translate3d(18px, 10px, 0) scale(0.985); }
+    to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  }
+
+  /* Keeps below-the-fold paint work out of the initial frame while retaining
+     server-rendered HTML for crawlers and anchor navigation. */
+  .home-deferred {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 760px;
+  }
+
   @keyframes home-float {
     0%,
     100% {

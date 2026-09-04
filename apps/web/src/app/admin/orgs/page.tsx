@@ -15,6 +15,12 @@ const SUB_TONE: Record<string, "success" | "warn" | "danger" | "neutral"> = {
   CANCELED: "neutral",
 };
 
+type OrgBillingSummary = {
+  status: string;
+  plan: { monthlyCents: number } | null;
+  subscription: { status: string } | null;
+};
+
 export default async function AdminOrgs() {
   await requirePlatformAdminPage();
 
@@ -34,7 +40,7 @@ export default async function AdminOrgs() {
     prisma.plan.findMany({ orderBy: { monthlyCents: "asc" }, select: { id: true, name: true } }),
   ]);
 
-  const mrr = orgs.reduce((sum, o) => {
+  const mrr = orgs.reduce<number>((sum, o: OrgBillingSummary) => {
     const paying =
       (o.plan?.monthlyCents ?? 0) > 0 &&
       o.status === "ACTIVE" &&
@@ -42,7 +48,7 @@ export default async function AdminOrgs() {
     return sum + (paying ? o.plan!.monthlyCents : 0);
   }, 0);
   const payingCount = orgs.filter(
-    (o) => (o.plan?.monthlyCents ?? 0) > 0 && o.status === "ACTIVE" && o.subscription?.status === "ACTIVE",
+    (o: OrgBillingSummary) => (o.plan?.monthlyCents ?? 0) > 0 && o.status === "ACTIVE" && o.subscription?.status === "ACTIVE",
   ).length;
 
   return (

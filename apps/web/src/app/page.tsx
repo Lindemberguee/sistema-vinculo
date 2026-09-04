@@ -25,6 +25,26 @@ export const metadata: Metadata = {
   title: "Captação com clareza para o terceiro setor",
   description:
     "Crie campanhas, receba doações e cuide do relacionamento com seus apoiadores em uma plataforma feita para organizações brasileiras.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    title: "Captação com clareza para o terceiro setor",
+    description:
+      "Campanhas, checkout e relacionamento com doadores em uma plataforma feita para organizações brasileiras.",
+    siteName: "Doações",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Captação com clareza para o terceiro setor",
+    description:
+      "Campanhas, checkout e relacionamento com doadores em uma plataforma feita para organizações brasileiras.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
 };
 
 const featureCards = [
@@ -97,6 +117,57 @@ const faqs = [
       "Sim. O checkout e o CRM foram pensados para doações pontuais e recorrentes, com histórico para a equipe acompanhar a relação ao longo do tempo.",
   },
 ];
+
+const pricingPlans = [
+  {
+    name: "Inicial",
+    price: "R$ 99",
+    volume: "até R$ 5 mil/mês",
+    description: "Para começar a organizar sua captação.",
+    features: ["1 campanha ativa", "Checkout Pix e cartão", "CRM básico de doadores", "Até 2 usuários"],
+  },
+  {
+    name: "Essencial",
+    price: "R$ 249",
+    volume: "até R$ 20 mil/mês",
+    description: "Para equipes que já captam com consistência.",
+    features: ["Campanhas ampliadas", "Doações recorrentes", "CRM completo e segmentação", "Até 5 usuários"],
+    featured: true,
+  },
+  {
+    name: "Crescimento",
+    price: "R$ 549",
+    volume: "até R$ 60 mil/mês",
+    description: "Para transformar dados em relacionamento.",
+    features: ["Automações de comunicação", "Eventos, rifas e embaixadores", "Relatórios avançados", "Até 10 usuários"],
+  },
+  {
+    name: "Profissional",
+    price: "R$ 999",
+    volume: "até R$ 150 mil/mês",
+    description: "Para operações estruturadas e multidisciplinares.",
+    features: ["Todos os módulos aprovados", "Integrações padrão", "Suporte prioritário", "Revisão trimestral da operação"],
+  },
+];
+
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map(({ question, answer }) => ({
+    "@type": "Question",
+    name: question,
+    acceptedAnswer: { "@type": "Answer", text: answer },
+  })),
+};
+
+const softwareSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Doações",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  description: metadata.description,
+};
 
 function Logo({ dark = false }: { dark?: boolean }) {
   return (
@@ -214,6 +285,8 @@ function DashboardPreview() {
 export default function MarketingHome() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#f7fbf9] text-ink">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <section className="relative isolate overflow-hidden bg-[#071f19] text-white">
         <div className="home-grid absolute inset-0 opacity-60" aria-hidden="true" />
         <div className="home-ambient absolute -right-40 -top-48 size-[32rem]" aria-hidden="true" />
@@ -225,6 +298,8 @@ export default function MarketingHome() {
             <Link className="transition-colors hover:text-white" href="#recursos">Recursos</Link>
             <Link className="transition-colors hover:text-white" href="#como-funciona">Como funciona</Link>
             <Link className="transition-colors hover:text-white" href="#transparencia">Transparência</Link>
+            <Link className="transition-colors hover:text-white" href="#simulador">Simulador</Link>
+            <Link className="transition-colors hover:text-white" href="#planos">Planos</Link>
             <Link className="transition-colors hover:text-white" href="#duvidas">Dúvidas</Link>
           </nav>
           <div className="flex items-center gap-2.5">
@@ -239,17 +314,17 @@ export default function MarketingHome() {
 
         <div className="relative z-10 mx-auto grid max-w-7xl gap-12 px-5 pb-20 pt-12 sm:px-8 md:pb-28 md:pt-20 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:gap-16 lg:px-10 lg:pt-24">
           <div className="max-w-2xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1.5 text-[0.68rem] font-medium uppercase tracking-[0.12em] text-[#b8f4d9] backdrop-blur-sm">
+            <div className="home-reveal home-reveal--1 mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1.5 text-[0.68rem] font-medium uppercase tracking-[0.12em] text-[#b8f4d9] backdrop-blur-sm">
               <span className="size-1.5 rounded-full bg-[#72d1ad] shadow-[0_0_0_4px_rgb(114_209_173/0.14)]" />
               Feito para o terceiro setor
             </div>
-            <h1 className="max-w-xl text-4xl font-semibold leading-[1.06] tracking-[-0.045em] sm:text-5xl lg:text-[4.35rem]">
+            <h1 className="home-reveal home-reveal--2 max-w-xl text-4xl font-semibold leading-[1.06] tracking-[-0.045em] sm:text-5xl lg:text-[4.35rem]">
               Mais tempo para a causa. <span className="text-[#8fe1bf]">Mais clareza para captar.</span>
             </h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-white/68 sm:text-lg sm:leading-8">
+            <p className="home-reveal home-reveal--3 mt-6 max-w-xl text-base leading-7 text-white/68 sm:text-lg sm:leading-8">
               Campanhas, checkout e relacionamento com doadores em um só lugar — com a sua conta, os seus dados e o seu jeito de fazer impacto.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="home-reveal home-reveal--4 mt-8 flex flex-col gap-3 sm:flex-row">
               <LinkButton href="/onboarding" className="min-h-12 bg-[#8fe1bf] px-5 text-sm font-semibold text-[#073b2d] shadow-[0_14px_30px_rgb(41_162_119/0.2)] hover:bg-[#b8f4d9]">
                 Criar minha organização <ArrowRight className="size-4" aria-hidden="true" />
               </LinkButton>
@@ -257,13 +332,13 @@ export default function MarketingHome() {
                 Conhecer a plataforma
               </LinkButton>
             </div>
-            <div className="mt-9 flex flex-wrap gap-x-5 gap-y-2.5 text-xs text-white/55">
+            <div className="home-reveal home-reveal--5 mt-9 flex flex-wrap gap-x-5 gap-y-2.5 text-xs text-white/55">
               <span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-[#8fe1bf]" /> Sem comissão da plataforma</span>
               <span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-[#8fe1bf]" /> Pix, cartão e recorrência</span>
               <span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-[#8fe1bf]" /> Controle dos seus dados</span>
             </div>
           </div>
-          <DashboardPreview />
+          <div className="home-reveal home-reveal--dashboard"><DashboardPreview /></div>
         </div>
 
         <div className="relative z-10 border-t border-white/10 bg-white/[0.035]">
@@ -284,7 +359,7 @@ export default function MarketingHome() {
         </div>
       </section>
 
-      <section id="recursos" className="mx-auto max-w-7xl scroll-mt-8 px-5 py-20 sm:px-8 md:py-28 lg:px-10">
+      <section id="recursos" className="home-deferred mx-auto max-w-7xl scroll-mt-8 px-5 py-20 sm:px-8 md:py-28 lg:px-10">
         <div className="max-w-2xl">
           <p className="eyebrow text-brand-600">Uma operação mais leve</p>
           <h2 className="mt-3 max-w-xl text-3xl leading-tight tracking-[-0.04em] sm:text-4xl">Tudo o que a sua equipe precisa para cuidar do apoio.</h2>
@@ -303,7 +378,7 @@ export default function MarketingHome() {
         </div>
       </section>
 
-      <section id="como-funciona" className="scroll-mt-8 border-y border-[#dce9e2] bg-[#edf6f1]">
+      <section id="como-funciona" className="home-deferred scroll-mt-8 border-y border-[#dce9e2] bg-[#edf6f1]">
         <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8 md:py-28 lg:px-10">
           <div className="grid gap-12 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20">
             <div>
@@ -330,7 +405,7 @@ export default function MarketingHome() {
         </div>
       </section>
 
-      <section id="transparencia" className="scroll-mt-8 bg-[#f7fbf9] px-5 py-20 sm:px-8 md:py-28 lg:px-10">
+      <section id="transparencia" className="home-deferred scroll-mt-8 bg-[#f7fbf9] px-5 py-20 sm:px-8 md:py-28 lg:px-10">
         <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-20">
           <div className="relative overflow-hidden rounded-[1.75rem] bg-[#092a20] p-7 text-white shadow-[0_24px_70px_rgb(10_69_54/0.18)] sm:p-10">
             <div className="home-grid absolute inset-0 opacity-35" aria-hidden="true" />
@@ -367,22 +442,49 @@ export default function MarketingHome() {
 
       <DonationCalculator />
 
-      <section className="border-y border-[#dce9e2] bg-white px-5 py-20 sm:px-8 md:py-24 lg:px-10">
+      <section id="planos" className="home-deferred scroll-mt-8 border-y border-[#dce9e2] bg-white px-5 py-20 sm:px-8 md:py-24 lg:px-10">
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-            <div className="max-w-2xl"><p className="eyebrow text-brand-600">Para cada fase da sua organização</p><h2 className="mt-3 text-3xl leading-tight tracking-[-0.04em] sm:text-4xl">Uma licença que acompanha seu crescimento.</h2></div>
-            <p className="max-w-xs text-sm leading-6 text-muted md:text-right">Comece com o essencial e adicione recursos quando a operação pedir. Sem taxa sobre cada doação.</p>
+            <div className="max-w-2xl">
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="eyebrow text-brand-600">Para cada fase da sua organização</p>
+                <span className="inline-flex items-center rounded-full border border-[#dfc98f] bg-[#fffaf0] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.1em] text-[#785c20]">Valores iniciais em validação</span>
+              </div>
+              <h2 className="mt-3 text-3xl leading-tight tracking-[-0.04em] sm:text-4xl">Uma licença que acompanha seu crescimento.</h2>
+            </div>
+            <p className="max-w-sm text-sm leading-6 text-muted md:text-right">Mensalidade previsível, sem comissão da plataforma sobre doações. As tarifas do Pagar.me são cobradas diretamente pelo gateway.</p>
           </div>
-          <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {["Campanhas e checkout", "CRM de doadores", "Eventos, rifas e leilões", "Relatórios e exportações"].map((item, index) => (
-              <div key={item} className="flex items-center gap-3 rounded-xl border border-[#dce9e2] bg-[#f8fbf9] px-4 py-4 text-sm font-medium"><span className="font-mono text-[0.65rem] text-brand-500">0{index + 1}</span>{item}</div>
+
+          <div className="mt-10 grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {pricingPlans.map(({ name, price, volume, description, features, featured }) => (
+              <article key={name} className={`relative flex h-full flex-col rounded-2xl border p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgb(20_60_42/0.09)] ${featured ? "border-brand-500 bg-[#f0faf4] shadow-[0_12px_28px_rgb(20_100_67/0.1)]" : "border-[#dce9e2] bg-[#f8fbf9]"}`}>
+                {featured && <span className="absolute -top-3 left-5 rounded-full bg-brand-600 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.1em] text-white">Mais escolhido</span>}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-xl tracking-[-0.025em]">{name}</h3>
+                    <p className="mt-2 min-h-12 text-sm leading-6 text-muted">{description}</p>
+                  </div>
+                  <Sparkles className={`mt-1 size-5 shrink-0 ${featured ? "text-brand-600" : "text-[#a9863f]"}`} aria-hidden="true" />
+                </div>
+                <p className="mt-6 text-3xl font-semibold tracking-[-0.05em]">{price}<span className="ml-1 text-sm font-medium tracking-normal text-muted">/mês</span></p>
+                <p className="mt-1 text-xs font-medium text-brand-700">Volume de referência: {volume}</p>
+                <ul className="mt-6 flex flex-1 flex-col gap-3 border-t border-[#dce9e2] pt-5 text-sm text-muted">
+                  {features.map((feature) => <li key={feature} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden="true" />{feature}</li>)}
+                </ul>
+                <Link href="/onboarding" className={`mt-7 inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors ${featured ? "bg-brand-600 text-white hover:bg-brand-700" : "border border-[#c7ddd1] text-brand-700 hover:bg-white"}`}>Começar agora <ArrowRight className="size-4" aria-hidden="true" /></Link>
+              </article>
             ))}
           </div>
-          <div className="mt-8 flex flex-col items-start justify-between gap-4 rounded-2xl bg-[#f2f8f4] px-5 py-5 sm:flex-row sm:items-center sm:px-6"><div className="flex items-center gap-3"><Sparkles className="size-5 text-[#a9863f]" aria-hidden="true" /><p className="text-sm text-muted">Sem contrato longo. Sem surpresa no repasse.</p></div><Link href="/onboarding" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700">Conhecer os planos <ArrowRight className="size-4" aria-hidden="true" /></Link></div>
+
+          <div className="mt-5 flex flex-col items-start justify-between gap-4 rounded-2xl bg-[#f2f8f4] px-5 py-5 sm:flex-row sm:items-center sm:px-6">
+            <div><p className="text-sm font-semibold">Escala <span className="ml-2 text-base tracking-[-0.02em] text-brand-700">R$ 1.799/mês</span> <span className="mx-1 text-muted">·</span> Enterprise <span className="text-base tracking-[-0.02em] text-brand-700">a partir de R$ 2.990/mês</span></p><p className="mt-1 text-sm text-muted">Mais volume, governança e condições sob medida para operações maiores.</p></div>
+            <Link href="/onboarding" className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-brand-700">Falar com a equipe <ArrowRight className="size-4" aria-hidden="true" /></Link>
+          </div>
+          <p className="mt-5 text-center text-xs leading-5 text-muted">Os valores exibidos são uma hipótese inicial de planos e podem mudar após a validação com organizações. Nunca há cobrança retroativa.</p>
         </div>
       </section>
 
-      <section id="duvidas" className="mx-auto max-w-4xl scroll-mt-8 px-5 py-20 sm:px-8 md:py-28">
+      <section id="duvidas" className="home-deferred mx-auto max-w-4xl scroll-mt-8 px-5 py-20 sm:px-8 md:py-28">
         <div className="text-center"><p className="eyebrow text-brand-600">Perguntas frequentes</p><h2 className="mt-3 text-3xl tracking-[-0.04em] sm:text-4xl">Antes de começar, tudo bem claro.</h2></div>
         <div className="mt-10 divide-y divide-[#dce9e2] rounded-2xl border border-[#dce9e2] bg-white px-5 sm:px-7">
           {faqs.map(({ question, answer }) => (
