@@ -15,11 +15,18 @@ const SUB_TONE: Record<string, "success" | "warn" | "danger" | "neutral"> = {
   CANCELED: "neutral",
 };
 
-type OrgBillingSummary = {
+type AdminOrg = {
+  id: string;
+  displayName: string;
+  slug: string;
   status: string;
+  planId: string;
   plan: { monthlyCents: number } | null;
-  subscription: { status: string } | null;
+  subscription: { status: string; currentPeriodEnd: Date; lastPaidAt: Date | null } | null;
 };
+
+type OrgBillingSummary = Pick<AdminOrg, "status" | "plan" | "subscription">;
+type AdminPlan = { id: string; name: string };
 
 export default async function AdminOrgs() {
   await requirePlatformAdminPage();
@@ -40,7 +47,9 @@ export default async function AdminOrgs() {
     prisma.plan.findMany({ orderBy: { monthlyCents: "asc" }, select: { id: true, name: true } }),
   ]);
 
-  const billingOrgs = orgs as OrgBillingSummary[];
+  const adminOrgs = orgs as AdminOrg[];
+  const adminPlans = plans as AdminPlan[];
+  const billingOrgs: OrgBillingSummary[] = adminOrgs;
   const mrr = billingOrgs.reduce((sum: number, o: OrgBillingSummary) => {
     const paying =
       (o.plan?.monthlyCents ?? 0) > 0 &&
@@ -93,7 +102,7 @@ export default async function AdminOrgs() {
             </Tr>
           </thead>
           <tbody>
-            {orgs.map((o) => (
+            {adminOrgs.map((o) => (
               <Tr key={o.id}>
                 <Td>
                   <div className="font-medium">{o.displayName}</div>
@@ -116,7 +125,7 @@ export default async function AdminOrgs() {
                   {o.subscription?.lastPaidAt ? dt.format(o.subscription.lastPaidAt) : "—"}
                 </Td>
                 <Td>
-                  <AdminOrgActions orgId={o.id} planId={o.planId} orgStatus={o.status} plans={plans} />
+                  <AdminOrgActions orgId={o.id} planId={o.planId} orgStatus={o.status} plans={adminPlans} />
                 </Td>
               </Tr>
             ))}

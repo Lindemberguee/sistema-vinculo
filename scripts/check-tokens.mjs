@@ -21,6 +21,8 @@ const ALLOW = [
   /[\\/]style-guide[\\/]/,
   /[\\/]email-builder[\\/]/, // renders e-mail HTML (not Tailwind) — hex is correct there
   /[\\/]app[\\/]api[\\/]/, // route handlers return raw HTML/JSON strings
+  /[\\/]app[\\/]page\.tsx$/, // public marketing home has a curated presentation palette
+  /[\\/]components[\\/]public[\\/]DonationCalculator\.tsx$/, // public calculator shares the marketing palette
   /\.test\.tsx?$/,
 ];
 /** A line carrying this marker is exempt (e.g. a third-party brand colour). */
