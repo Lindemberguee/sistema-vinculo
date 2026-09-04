@@ -1,4 +1,4 @@
-name: donation-saas
+name: sistema-vinculo
 
 services:
   postgres:

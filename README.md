@@ -1,4 +1,4 @@
-# donation-saas
+# Sistema Vínculo
 
 > Documentação técnica atual: [`docs/INDEX.md`](docs/INDEX.md). A auditoria de 04/09/2026 identificou bloqueadores que precisam ser resolvidos antes de operar pagamentos reais em produção.
 
