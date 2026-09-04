@@ -9,6 +9,7 @@ Atualizada em 4 de setembro de 2026 a partir do código existente no workspace.
 3. [Auditoria técnica e de segurança](./AUDIT-2026-09-04.md) — falhas confirmadas, riscos, evidências e plano de correção.
 4. [Identidade visual](./identidade-visual.md) — referência de marca, tokens, componentes e acessibilidade já existente no projeto.
 5. [Plano de monetização](./PLANO-MONETIZACAO.md) — mensalidade fixa, faixas de uso, progressão e requisitos de cobrança.
+6. [Plano de refinamento UI/UX](./UI-UX-REFINAMENTO.md) — direção visual, fundação compartilhada, fases e critérios de aceite.
 
 ## Estado resumido
 

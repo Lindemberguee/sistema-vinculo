@@ -23,15 +23,15 @@ export default async function FinancePage({ params }: { params: Promise<{ orgId:
     <>
       <PageHeader
         title="Finanças"
-        description="Quanto sua organização já recebeu e quanto ainda falta repassar."
+        description="Acompanhe o que foi pago e o que o gateway ainda vai liberar para sua organização."
       />
 
       <div className="space-y-4">
         <SummaryStrip
           stats={[
             { label: "Bruto arrecadado", value: formatBRL(f.grossCents) },
-            { label: "Taxa da plataforma", value: formatBRL(f.platformFeeCents) },
-            { label: "Líquido da ONG", value: formatBRL(f.netCents) },
+            { label: "Taxas do gateway", value: formatBRL(f.platformFeeCents) },
+            { label: "Líquido recebido pela ONG", value: formatBRL(f.netCents) },
             { label: "Repassado", value: formatBRL(f.paidOutCents) },
             { label: "Estornado", value: formatBRL(f.reversedCents) },
           ]}

@@ -211,9 +211,10 @@ export function PanelSidebar({
                     key={item.label}
                     href={href}
                     title={collapsed ? (modLocked ? `${item.label} (plano)` : item.label) : undefined}
+                    aria-label={collapsed ? (modLocked ? `${item.label} (plano)` : item.label) : undefined}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "group relative flex items-center rounded-lg text-ui font-medium transition-colors",
+                      "group relative flex min-h-10 items-center rounded-lg text-ui font-medium transition-colors",
                       collapsed ? "mx-auto size-9 justify-center" : "gap-2.5 px-2.5 py-2",
                       active ? "bg-brand-50 text-brand-700" : "text-muted hover:bg-canvas hover:text-ink",
                     )}

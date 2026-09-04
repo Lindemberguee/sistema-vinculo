@@ -12,10 +12,10 @@ export function Table({
   dense?: boolean;
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="-mx-1 overflow-x-auto px-1 pb-1">
       <table
         className={cn(
-          "w-full border-collapse text-sm [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-canvas/70",
+          "min-w-[38rem] w-full border-collapse text-sm [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-canvas/70",
           dense && "[&_.td]:!py-1.5 [&_.th]:!py-1.5",
           className,
         )}

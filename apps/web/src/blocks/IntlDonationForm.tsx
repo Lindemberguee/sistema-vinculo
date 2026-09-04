@@ -111,7 +111,7 @@ export function IntlDonationForm(props: IntlDonationFormProps) {
         </Labeled>
       </div>
 
-      {error && <p className="field-error mt-2">{error}</p>}
+      {error && <p className="field-error mt-2" role="alert">{error}</p>}
 
       <button type="submit" disabled={busy} className="mt-3 w-full rounded-full py-3 text-[15px] font-medium text-white disabled:opacity-50" style={{ background: accent }}>
         {busy ? "Redirecting…" : "Continue to payment"}

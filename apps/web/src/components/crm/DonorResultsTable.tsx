@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ListChecks, X } from "lucide-react";
@@ -49,6 +49,14 @@ export function DonorResultsTable({
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDue, setTaskDue] = useState("");
   const [taskAssignee, setTaskAssignee] = useState("");
+
+  // A selection belongs to the visible result set. Clear it whenever the
+  // server sends a different page/filter so bulk actions can never target
+  // donors that are no longer on screen.
+  useEffect(() => {
+    setSelected(new Set());
+    setMode(null);
+  }, [rows]);
 
   const ids = useMemo(() => [...selected], [selected]);
   const allChecked = rows.length > 0 && selected.size === rows.length;

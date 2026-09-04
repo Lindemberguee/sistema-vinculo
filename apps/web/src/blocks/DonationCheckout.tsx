@@ -520,7 +520,7 @@ export function DonationCheckout(props: DonationCheckoutProps) {
         </div>
       </fieldset>
 
-      {error && <p className="field-error mb-2">{error}</p>}
+        {error && <p className="field-error mb-2" role="alert">{error}</p>}
 
       <button type="submit" disabled={busy || props.preview} className={submit} style={{ background: accent }}>
         {props.preview ? "Pré-visualização — doações desativadas" : busy ? "Processando…" : `Doar ${brl(totalCents)}`}

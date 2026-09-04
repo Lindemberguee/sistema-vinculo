@@ -208,11 +208,11 @@ export function EventCheckout(props: EventCheckoutProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" className="rounded-md border border-line px-2" onClick={() => setQ(t.id, (qty[t.id] ?? 0) - 1, Math.min(t.available, t.maxPerOrder))}>
+              <button type="button" aria-label={`Remover ingresso ${t.name}`} className="grid min-h-10 min-w-10 place-items-center rounded-md border border-line px-2" onClick={() => setQ(t.id, (qty[t.id] ?? 0) - 1, Math.min(t.available, t.maxPerOrder))}>
                 −
               </button>
               <span className="w-6 text-center tabular-nums">{qty[t.id] ?? 0}</span>
-              <button type="button" className="rounded-md border border-line px-2" disabled={t.available === 0} onClick={() => setQ(t.id, (qty[t.id] ?? 0) + 1, Math.min(t.available, t.maxPerOrder))}>
+              <button type="button" aria-label={`Adicionar ingresso ${t.name}`} className="grid min-h-10 min-w-10 place-items-center rounded-md border border-line px-2" disabled={t.available === 0} onClick={() => setQ(t.id, (qty[t.id] ?? 0) + 1, Math.min(t.available, t.maxPerOrder))}>
                 +
               </button>
             </div>
@@ -269,7 +269,7 @@ export function EventCheckout(props: EventCheckoutProps) {
         </label>
       </div>
 
-      {error && <p className="field-error mt-2">{error}</p>}
+      {error && <p className="field-error mt-2" role="alert">{error}</p>}
 
       <button type="submit" disabled={busy} className="mt-3 w-full rounded-full py-3 text-[15px] font-medium text-white disabled:opacity-50" style={{ background: accent }}>
         {busy ? "Processando…" : `Comprar ${totalTickets} ingresso${totalTickets === 1 ? "" : "s"} — ${brl(totalCents)}`}
