@@ -38,13 +38,17 @@ export function Canvas({
   const remove = useCallback((id: string) => dispatch({ type: "remove", id }), [dispatch]);
 
   return (
-    <div className="h-full overflow-y-auto bg-canvas p-6" onClick={() => dispatch({ type: "select", id: null })}>
+    <div className="h-full overflow-y-auto bg-canvas p-3 sm:p-6" onClick={() => dispatch({ type: "select", id: null })}>
       <div
         className={cn(
-          "@container mx-auto rounded-lg border border-line bg-surface shadow-[0_1px_3px_rgb(20_24_22/0.06),0_8px_24px_-12px_rgb(20_24_22/0.12)] transition-[max-width]",
+          "@container mx-auto w-full rounded-lg border border-line bg-surface shadow-[0_1px_3px_rgb(20_24_22/0.06),0_8px_24px_-12px_rgb(20_24_22/0.12)] transition-[max-width]",
           DEVICE_WIDTH[device],
         )}
       >
+        <div className="flex items-center justify-between border-b border-line bg-canvas/60 px-3 py-2 text-[0.6875rem] text-muted sm:px-4">
+          <span className="font-medium">Prévia aproximada</span>
+          <span>{device === "mobile" ? "Largura mobile · 390 px" : "Largura desktop · 900 px"}</span>
+        </div>
         {blocks.length === 0 ? (
           <EmptyState dispatch={dispatch} />
         ) : (
@@ -79,7 +83,7 @@ export function Canvas({
                   <button
                     type="button"
                     onClick={onAddClick}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-medium text-muted transition-colors hover:bg-canvas hover:text-ink"
+                    className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-medium text-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
                   >
                     <Plus className="size-3.5" /> Adicionar bloco
                   </button>

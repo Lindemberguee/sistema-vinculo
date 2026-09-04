@@ -24,14 +24,13 @@ export function Palette({
     return PALETTE.map((g) => ({
       ...g,
       items: g.items.filter(
-        (it) =>
-          BLOCK_REGISTRY[it.type].label.toLowerCase().includes(query) || it.hint.toLowerCase().includes(query),
+        (it) => BLOCK_REGISTRY[it.type].label.toLowerCase().includes(query) || it.hint.toLowerCase().includes(query),
       ),
     })).filter((g) => g.items.length > 0);
   }, [query]);
 
   return (
-    <div className="flex h-full flex-col border-r border-line-strong bg-surface">
+    <section aria-label="Biblioteca de blocos" className="flex h-full flex-col border-r border-line-strong bg-surface">
       <div className="border-b border-line p-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-faint" />
@@ -51,7 +50,7 @@ export function Palette({
         {groups.length === 0 && <p className="px-1 text-xs text-muted">Nenhum bloco encontrado.</p>}
         {groups.map((g) => (
           <div key={g.heading} className="mb-4 last:mb-0">
-            <div className="eyebrow px-1 pb-1.5">{g.heading}</div>
+            <h2 className="eyebrow px-1 pb-1.5">{g.heading}</h2>
             <div className="grid gap-1">
               {g.items.map((it) => (
                 <PaletteItem
@@ -65,7 +64,7 @@ export function Palette({
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -88,7 +87,7 @@ function PaletteItem({ type, hint, onInsert }: { type: BlockType; hint: string; 
         type="button"
         aria-label={`Arrastar ${label} para o canvas`}
         title="Arrastar para o canvas"
-        className="grid w-6 shrink-0 cursor-grab place-items-center rounded-l-lg text-faint hover:text-muted active:cursor-grabbing focus:outline-none focus-visible:text-brand-600"
+        className="grid min-h-10 w-9 shrink-0 cursor-grab place-items-center rounded-l-lg text-faint hover:text-muted active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 focus-visible:text-brand-600"
         {...attributes}
         {...listeners}
       >
@@ -97,7 +96,7 @@ function PaletteItem({ type, hint, onInsert }: { type: BlockType; hint: string; 
       <button
         type="button"
         onClick={onInsert}
-        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-r-lg py-1.5 pr-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+        className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-r-lg py-1.5 pr-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
       >
         <span className="grid size-7 shrink-0 place-items-center rounded-md bg-canvas text-muted">
           <BlockIcon type={type} className="size-4" />
