@@ -40,14 +40,15 @@ export default async function AdminOrgs() {
     prisma.plan.findMany({ orderBy: { monthlyCents: "asc" }, select: { id: true, name: true } }),
   ]);
 
-  const mrr = orgs.reduce<number>((sum, o: OrgBillingSummary) => {
+  const billingOrgs = orgs as OrgBillingSummary[];
+  const mrr = billingOrgs.reduce((sum: number, o: OrgBillingSummary) => {
     const paying =
       (o.plan?.monthlyCents ?? 0) > 0 &&
       o.status === "ACTIVE" &&
       (o.subscription?.status === "ACTIVE" || o.subscription?.status === "TRIALING");
     return sum + (paying ? o.plan!.monthlyCents : 0);
   }, 0);
-  const payingCount = orgs.filter(
+  const payingCount = billingOrgs.filter(
     (o: OrgBillingSummary) => (o.plan?.monthlyCents ?? 0) > 0 && o.status === "ACTIVE" && o.subscription?.status === "ACTIVE",
   ).length;
 
