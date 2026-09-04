@@ -543,7 +543,7 @@ async function RaffleBlock({
         quickAmounts={quickAmounts}
         allowPickNumbers={allowPickNumbers}
         allowTip={ctx.campaign.allowTip}
-        tipLabel="Quero cobrir a taxa da plataforma"
+        tipLabel="Adicionar uma contribuição extra à causa"
         platformFeeBps={ctx.platformFeeBps}
         pagarmePublicKey={ctx.pagarmePublicKey}
         accentColor={accent}
@@ -601,7 +601,7 @@ async function EventBlock({
           maxPerOrder: t.maxPerOrder,
         }))}
         allowTip={ctx.campaign.allowTip}
-        tipLabel="Quero cobrir a taxa da plataforma"
+        tipLabel="Adicionar uma contribuição extra à causa"
         platformFeeBps={ctx.platformFeeBps}
         pagarmePublicKey={ctx.pagarmePublicKey}
         accentColor={accent}

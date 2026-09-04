@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSplit, calculateFees, type FeeConfig } from "./fee";
+import { buildSplit, calculateFees, BYOG_FEE_CONFIG, type FeeConfig } from "./fee";
 
 const FREE: FeeConfig = { platformFeeBps: 690, platformFeeFixedCents: 0 };
 const ESSENCIAL: FeeConfig = { platformFeeBps: 490, platformFeeFixedCents: 0 };
@@ -7,6 +7,11 @@ const PRO: FeeConfig = { platformFeeBps: 390, platformFeeFixedCents: 0 };
 const WITH_FIXED: FeeConfig = { platformFeeBps: 390, platformFeeFixedCents: 100 };
 
 describe("calculateFees", () => {
+  it("has no platform fee for BYOG/CONNECTED", () => {
+    const r = calculateFees({ amountCents: 10000, tipCents: 250, config: BYOG_FEE_CONFIG });
+    expect(r.platformFeeCents).toBe(0);
+    expect(r.netToOrgCents).toBe(10250);
+  });
   it("applies a percentage fee with ceil rounding", () => {
     // 5000 * 4.9% = 245.0 exactly
     const r = calculateFees({ amountCents: 5000, config: ESSENCIAL });

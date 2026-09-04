@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma, prisma } from "@donation/db";
 import { isAppError } from "@donation/shared";
-import { getGateway, type OrgKycData } from "@donation/payments";
 import { requireOrgAccess, requireUser } from "@/server/auth-helpers";
 
 export interface OnboardingResult {
@@ -155,7 +154,7 @@ const submitSchema = z.object({
 
 const REQUIRED_DOCS = ["ESTATUTO", "CARTAO_CNPJ", "DOC_RESPONSAVEL", "COMPROVANTE_BANCARIO"] as const;
 
-/** Final step → persist rep + bank data, create the Pagar.me recipient (best effort). */
+/** Final step → persist representative/bank data and submit the platform KYC review. */
 export async function submitOnboarding(organizationId: string, formData: FormData): Promise<OnboardingResult> {
   let kycQueued = false;
   try {
@@ -166,7 +165,7 @@ export async function submitOnboarding(organizationId: string, formData: FormDat
 
     const org = await db.organization.findFirst({
       where: { id: organizationId },
-      select: { legalName: true, cnpj: true, kyc: true, kycDocuments: { select: { kind: true } } },
+      select: { kyc: true, kycDocuments: { select: { kind: true } } },
     });
     if (!org?.kyc) return { ok: false, error: "Complete os passos anteriores primeiro" };
 
@@ -192,45 +191,10 @@ export async function submitOnboarding(organizationId: string, formData: FormDat
         submittedAt: new Date(),
       },
     });
-    await db.organization.update({ where: { id: organizationId }, data: { kycStatus: "SUBMITTED" } });
-
-    // Best effort: creating the recipient needs live Pagar.me credentials.
-    const addr = org.kyc.address as Record<string, string>;
-    const kycData: OrgKycData = {
-      organizationId,
-      legalName: org.legalName,
-      cnpj: org.cnpj,
-      email: org.kyc.contactEmail,
-      phone: org.kyc.contactPhone,
-      address: {
-        street: addr.street ?? "",
-        number: addr.number ?? "",
-        zipCode: addr.zipCode ?? "",
-        city: addr.city ?? "",
-        state: addr.state ?? "",
-        neighborhood: addr.neighborhood ?? "",
-      },
-      bankAccount: {
-        bankCode: d.bankCode,
-        branchNumber: d.branchNumber,
-        accountNumber: d.accountNumber,
-        accountCheckDigit: d.accountCheckDigit,
-        holderName: d.legalRepName,
-        holderDocument: org.cnpj,
-        type: d.accountType,
-      },
-    };
-
-    try {
-      const { recipientId } = await getGateway().createRecipient(kycData);
-      await db.organization.update({
-        where: { id: organizationId },
-        data: { gatewayRecipientId: recipientId, kycStatus: "IN_REVIEW" },
-      });
-      kycQueued = true;
-    } catch (gwErr) {
-      console.warn("createRecipient failed (will retry from panel):", gwErr instanceof Error ? gwErr.message : gwErr);
-    }
+    // BYOG does not create a platform recipient. KYC remains a platform review
+    // step, while payment-provider onboarding happens in Pagamentos.
+    await db.organization.update({ where: { id: organizationId }, data: { kycStatus: "IN_REVIEW" } });
+    kycQueued = true;
 
     await db.auditLog.create({
       data: { organizationId, userId, action: "kyc.submitted", entity: "Organization", entityId: organizationId, diff: {} },
@@ -247,29 +211,12 @@ export async function submitOnboarding(organizationId: string, formData: FormDat
 /** Panel button: pull the current KYC status from the gateway. */
 export async function refreshKycStatus(organizationId: string): Promise<OnboardingResult> {
   try {
-    const { db } = await requireOrgAccess(organizationId, "ADMIN");
-    const org = await db.organization.findFirst({
-      where: { id: organizationId },
-      select: { gatewayRecipientId: true },
-    });
-    if (!org?.gatewayRecipientId) {
-      // No recipient yet → try to (re)create it via submit path is simpler; just report.
-      return { ok: false, error: "Ainda não há um recebedor criado. Reenvie o cadastro." };
-    }
-
-    const status = await getGateway().getRecipientStatus(org.gatewayRecipientId);
-    const kycStatus = status === "APPROVED" ? "APPROVED" : status === "REJECTED" ? "REJECTED" : "IN_REVIEW";
-
-    await db.organization.update({
-      where: { id: organizationId },
-      data: { kycStatus, status: kycStatus === "APPROVED" ? "ACTIVE" : undefined },
-    });
+    await requireOrgAccess(organizationId, "ADMIN");
+    return { ok: false, organizationId, error: "O KYC é revisado pela equipe. Conecte também a conta própria do provedor em Pagamentos." };
   } catch (err) {
     if (isAppError(err)) return { ok: false, error: err.message };
     throw err;
   }
-  revalidatePath(`/panel/orgs/${organizationId}`);
-  return { ok: true, organizationId };
 }
 
 /** `useActionState` adapters. */

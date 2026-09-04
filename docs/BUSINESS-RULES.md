@@ -40,12 +40,14 @@ Memberships e papéis são copiados para o JWT no login e em uma atualização e
 
 | Plano | Mensalidade | Taxa configurada | Campanhas | Usuários | Módulos |
 | --- | ---: | ---: | ---: | ---: | --- |
-| Free | R$ 0 | 6,90% | 1 | 2 | núcleo |
-| Essencial | R$ 99 | 4,90% | ilimitadas | 5 | CRM |
-| Pro | R$ 299 | 3,90% | ilimitadas | 10 | todos os módulos listados |
-| Enterprise | negociado | 2,90% | ilimitadas | ilimitados | todos |
+| Inicial | R$ 99 | 0% | 1 | 2 | núcleo |
+| Essencial | R$ 249 | 0% | ilimitadas | 5 | CRM |
+| Crescimento | R$ 549 | 0% | ilimitadas | 10 | todos os módulos listados |
+| Profissional | R$ 999 | 0% | ilimitadas | 25 | todos os módulos listados |
+| Escala | R$ 1.799 | 0% | ilimitadas | 50 | todos os módulos listados |
+| Enterprise | a partir de R$ 2.990 | 0% | ilimitadas | ilimitados | todos |
 
-Esses valores vêm do seed e conflitam com `doc.md`, que propõe BYOG com mensalidade de R$ 600–800 e taxa de plataforma de 0%. Nenhum valor deve ser publicado comercialmente antes de uma decisão única de pricing.
+Esses valores vêm do seed atualizado conforme a proposta em `PLANO-MONETIZACAO.md`. `doc.md` ainda contém a proposta histórica de BYOG com mensalidade de R$ 600–800; não é fonte vigente.
 
 ### Limites implementados
 
@@ -57,7 +59,7 @@ Esses valores vêm do seed e conflitam com `doc.md`, que propõe BYOG com mensal
 
 ### Lacunas observadas
 
-- O proprietário pode trocar imediatamente para qualquer plano público sem cobrança.
+- A troca self-service de plano está bloqueada até existir cobrança confirmada da licença (`AUD-005`).
 - A cobrança mensal automática está declarada como futura no próprio código.
 - O status/período da `Subscription` não participa de `getOrgLimits()`.
 - Vários módulos só são escondidos na UI ou protegidos em algumas ações; CRM, links, embaixadores e internacional não têm guard central consistente.
@@ -129,20 +131,16 @@ orgFeeBorne = max(0, platformFee - tip)
 ```
 
 Há invariantes para impedir líquido não positivo e garantir que as pernas do split conciliem com o total.
+Essa fórmula permanece apenas como helper compatível com dados legados. Em produção, todos os planos BYOG usam `platformFeeBps = 0`, `platformFeeFixedCents = 0` e split vazio; a tarifa cobrada pelo gateway não é receita da plataforma.
 
 ### Modos de pagamento
 
 | Modo | Conta do gateway | Split |
 | --- | --- | --- |
 | `CONNECTED` / BYOG | Conta própria da organização | vazio |
-| `MANAGED` | Conta da plataforma | organização + plataforma |
+| `MANAGED` | — | descontinuado |
 
-No modo gerenciado, a plataforma absorve a taxa de processamento do gateway segundo as opções de split.
-
-No modo conectado, o gateway recebe split vazio e deposita o valor na conta da organização. Entretanto, o banco ainda registra `platformFeeCents` e `netToOrgCents` calculados pelo plano. Isso cria taxa fantasma e líquido contábil diferente do repasse real. A decisão obrigatória é uma destas:
-
-1. BYOG é mensalidade sem percentual: zerar taxa da plataforma, registrar fee real do gateway e calcular líquido real.
-2. BYOG também paga percentual: implementar cobrança efetiva e conciliação dessa receita por um mecanismo compatível com o gateway/contrato.
+O modo `MANAGED` foi descontinuado. No modo conectado, o gateway recebe split vazio e deposita o valor na conta da organização. O código calcula `platformFeeCents = 0` e `netToOrgCents = amountCents + tipCents`; a tarifa do gateway continua fora do ledger da plataforma. A monetização da plataforma é a mensalidade.
 
 ## 6. Máquina de estados da doação
 
@@ -176,7 +174,7 @@ O arquivo de máquina de estados existe, mas o worker não o usa. Assim, um even
 
 ### Entrada
 
-- Pagar.me gerenciado: autenticação Basic configurada na plataforma.
+- Pagar.me BYOG: cada organização configura sua própria conta e segredo; não há autenticação global para novas conexões.
 - Pagar.me conectado: endpoint por organização e segredo próprio.
 - Stripe: assinatura oficial do webhook.
 - Resend: assinatura Svix quando o segredo está configurado.

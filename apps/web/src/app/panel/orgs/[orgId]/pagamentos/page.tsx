@@ -57,7 +57,7 @@ export default async function PaymentsPage({ params }: { params: Promise<{ orgId
               <div>
                 <div className="text-sm font-semibold">{PROVIDER_LABEL[cfg.provider] ?? cfg.provider} conectado</div>
                 <div className="mt-0.5 text-xs text-muted">
-                  Modo {cfg.mode === "MANAGED" ? "gerenciado (com split)" : "conectado (conta própria)"} · atualizado em{" "}
+                  Modo {cfg.mode === "MANAGED" ? "descontinuado — reconecte sua conta própria" : "conectado (conta própria)"} · atualizado em{" "}
                   {cfg.updatedAt.toLocaleString("pt-BR")}
                 </div>
               </div>

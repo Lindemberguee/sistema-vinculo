@@ -22,7 +22,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockMeta> = {
   image: { type: "image", label: "Imagem", icon: "Image", clientOnly: false, defaults: { url: "", alt: "" } },
   gallery: { type: "gallery", label: "Galeria", icon: "Images", clientOnly: false, defaults: { images: [], columns: 3 } },
   amountOptions: { type: "amountOptions", label: "Valores sugeridos", icon: "CircleDollarSign", clientOnly: true, defaults: { amountsCents: [2000, 5000, 10000, 25000], allowCustom: true, defaultIndex: 1 } },
-  donationCheckout: { type: "donationCheckout", label: "Checkout de doação", icon: "HandCoins", clientOnly: true, defaults: { methods: ["PIX", "CREDIT_CARD", "BOLETO"], allowRecurring: true, allowTip: true, tipLabel: "Quero cobrir a taxa da plataforma" } },
+  donationCheckout: { type: "donationCheckout", label: "Checkout de doação", icon: "HandCoins", clientOnly: true, defaults: { methods: ["PIX", "CREDIT_CARD", "BOLETO"], allowRecurring: true, allowTip: true, tipLabel: "Adicionar uma contribuição extra à causa" } },
   sponseeGrid: { type: "sponseeGrid", label: "Grade de apadrinhamento", icon: "Users", clientOnly: false, defaults: { title: "Escolha quem apadrinhar", columns: 3, showStory: true } },
   raffleWidget: { type: "raffleWidget", label: "Rifa", icon: "Ticket", clientOnly: true, defaults: { raffleId: "", quickAmounts: [1, 5, 10, 20], allowPickNumbers: true } },
   eventTickets: { type: "eventTickets", label: "Ingressos de evento", icon: "CalendarDays", clientOnly: true, defaults: { eventId: "", askAttendeeNames: false } },

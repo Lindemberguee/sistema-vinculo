@@ -6,10 +6,12 @@ const prisma = new PrismaClient();
 async function main() {
   // ── Platform plans ────────────────────────────────
   const plans = [
-    { id: "free", name: "Free", monthlyCents: 0, platformFeeBps: 690, platformFeeFixedCents: 0, limits: { maxCampaigns: 1, maxUsers: 2, customDomain: false, removeBranding: false, modules: [] } },
-    { id: "essencial", name: "Essencial", monthlyCents: 9900, platformFeeBps: 490, platformFeeFixedCents: 0, limits: { maxCampaigns: null, maxUsers: 5, customDomain: false, removeBranding: true, modules: ["crm"] } },
-    { id: "pro", name: "Pro", monthlyCents: 29900, platformFeeBps: 390, platformFeeFixedCents: 0, limits: { maxCampaigns: null, maxUsers: 10, customDomain: true, removeBranding: true, modules: ["crm", "raffles", "events", "auctions", "sponsees", "links", "ambassadors", "intl"] } },
-    { id: "enterprise", name: "Enterprise", monthlyCents: 0, platformFeeBps: 290, platformFeeFixedCents: 0, isPublic: false, limits: { maxCampaigns: null, maxUsers: null, customDomain: true, removeBranding: true, modules: ["*"] } },
+    { id: "free", name: "Inicial", monthlyCents: 9900, platformFeeBps: 0, platformFeeFixedCents: 0, limits: { maxCampaigns: 1, maxUsers: 2, customDomain: false, removeBranding: false, modules: [] } },
+    { id: "essencial", name: "Essencial", monthlyCents: 24900, platformFeeBps: 0, platformFeeFixedCents: 0, limits: { maxCampaigns: null, maxUsers: 5, customDomain: false, removeBranding: true, modules: ["crm"] } },
+    { id: "pro", name: "Crescimento", monthlyCents: 54900, platformFeeBps: 0, platformFeeFixedCents: 0, limits: { maxCampaigns: null, maxUsers: 10, customDomain: true, removeBranding: true, modules: ["crm", "raffles", "events", "auctions", "sponsees", "links", "ambassadors", "intl"] } },
+    { id: "profissional", name: "Profissional", monthlyCents: 99900, platformFeeBps: 0, platformFeeFixedCents: 0, limits: { maxCampaigns: null, maxUsers: 25, customDomain: true, removeBranding: true, modules: ["crm", "raffles", "events", "auctions", "sponsees", "links", "ambassadors", "intl"] } },
+    { id: "escala", name: "Escala", monthlyCents: 179900, platformFeeBps: 0, platformFeeFixedCents: 0, limits: { maxCampaigns: null, maxUsers: 50, customDomain: true, removeBranding: true, modules: ["crm", "raffles", "events", "auctions", "sponsees", "links", "ambassadors", "intl"] } },
+    { id: "enterprise", name: "Enterprise", monthlyCents: 299000, platformFeeBps: 0, platformFeeFixedCents: 0, isPublic: false, limits: { maxCampaigns: null, maxUsers: null, customDomain: true, removeBranding: true, modules: ["*"] } },
   ];
 
   for (const p of plans) {

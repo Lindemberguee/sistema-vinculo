@@ -32,7 +32,7 @@ export default async function BillingPage({ params }: { params: Promise<{ orgId:
   const [org, sub, plans, limits, campaignCount, memberCount] = await Promise.all([
     db.organization.findFirst({ where: { id: orgId }, select: { planId: true, plan: { select: { name: true, monthlyCents: true } } } }),
     prisma.subscription.findUnique({ where: { organizationId: orgId }, select: { status: true, currentPeriodEnd: true, lastPaidAt: true } }),
-    prisma.plan.findMany({ where: { isPublic: true }, orderBy: { monthlyCents: "asc" }, select: { id: true, name: true, monthlyCents: true, platformFeeBps: true } }),
+    prisma.plan.findMany({ where: { isPublic: true }, orderBy: { monthlyCents: "asc" }, select: { id: true, name: true, monthlyCents: true } }),
     getOrgLimits(orgId),
     db.campaign.count({ where: { organizationId: orgId } }),
     db.membership.count({ where: { organizationId: orgId } }),
@@ -116,7 +116,7 @@ export default async function BillingPage({ params }: { params: Promise<{ orgId:
           </CardBody>
         </Card>
 
-        <PlanSelector orgId={orgId} currentPlanId={org.planId} plans={plans} />
+        <PlanSelector currentPlanId={org.planId} plans={plans} />
 
         <p className="hint">
           A cobrança da mensalidade é combinada diretamente com nossa equipe (Pix ou boleto). A cobrança

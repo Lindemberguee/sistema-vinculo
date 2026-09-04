@@ -1,29 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { formatBRL } from "@donation/shared";
-import { refreshKycStatus } from "@/server/onboarding/actions";
-import { changePlan } from "@/server/billing/actions";
 import { Card, CardBody, Button, StatusBadge, cn } from "@/components/ui";
 
 export function KycCard({
-  orgId,
   orgStatus,
   kycStatus,
   docCount,
-  hasRecipient,
 }: {
-  orgId: string;
   orgStatus: string;
   kycStatus: string;
   docCount: number;
-  hasRecipient: boolean;
 }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [msg, setMsg] = useState<string | null>(null);
-
   return (
     <Card>
       <CardBody>
@@ -39,43 +28,23 @@ export function KycCard({
           </dd>
           <dt className="text-muted">Documentos enviados</dt>
           <dd>{docCount}</dd>
-          <dt className="text-muted">Recebedor no gateway</dt>
-          <dd>{hasRecipient ? "criado" : "pendente"}</dd>
         </dl>
-        {orgStatus !== "ACTIVE" && (
-          <div className="mt-3">
-            <Button
-              size="sm"
-              disabled={pending || !hasRecipient}
-              onClick={() =>
-                start(async () => {
-                  const r = await refreshKycStatus(orgId);
-                  setMsg(r.ok ? "Status atualizado." : (r.error ?? "Falha ao consultar"));
-                  router.refresh();
-                })
-              }
-            >
-              {pending ? "Consultando…" : "Verificar status agora"}
-            </Button>
-          </div>
-        )}
-        {msg && <p className="mt-2 text-sm text-muted">{msg}</p>}
+        <p className="mt-3 text-sm text-muted">
+          A conta de pagamentos é própria da organização. Conecte ou revise-a em <strong>Pagamentos</strong>;
+          o KYC da plataforma é analisado manualmente pela equipe.
+        </p>
       </CardBody>
     </Card>
   );
 }
 
 export function PlanSelector({
-  orgId,
   currentPlanId,
   plans,
 }: {
-  orgId: string;
   currentPlanId: string;
-  plans: { id: string; name: string; monthlyCents: number; platformFeeBps: number }[];
+  plans: { id: string; name: string; monthlyCents: number }[];
 }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -96,29 +65,14 @@ export function PlanSelector({
                 <div>
                   <strong className="text-sm">{p.name}</strong>
                   <div className="text-xs text-muted">
-                    {p.monthlyCents === 0 ? "Grátis" : `${formatBRL(p.monthlyCents)}/mês`} ·{" "}
-                    {(p.platformFeeBps / 100).toLocaleString("pt-BR", { minimumFractionDigits: 1 })}% por doação
+                    {p.monthlyCents === 0 ? "Sem mensalidade" : `${formatBRL(p.monthlyCents)}/mês`} · sem taxa da plataforma por doação
                   </div>
                 </div>
                 {active ? (
                   <span className="text-xs text-success">Plano atual</span>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={pending}
-                    onClick={() =>
-                      start(async () => {
-                        const r = await changePlan(orgId, p.id);
-                        if (!r.ok) setError(r.error ?? "Falha ao trocar de plano");
-                        else {
-                          setError(null);
-                          router.refresh();
-                        }
-                      })
-                    }
-                  >
-                    Mudar
+                  <Button size="sm" variant="secondary" onClick={() => setError("Solicite a mudança à equipe após confirmar a mensalidade.")}>
+                    Solicitar
                   </Button>
                 )}
               </div>
@@ -126,7 +80,7 @@ export function PlanSelector({
           })}
         </div>
         {error && <p className="mt-2 field-error">{error}</p>}
-        <p className="mt-2 hint">A cobrança mensal automática entra numa fase futura; a troca já vale para taxa e limites.</p>
+        <p className="mt-2 hint">A mensalidade é fixa e não há taxa da plataforma por doação. A mudança de plano é confirmada pela equipe após a contratação.</p>
       </CardBody>
     </Card>
   );

@@ -1,6 +1,6 @@
 # Plano de monetização por mensalidade
 
-**Status:** proposta para validação comercial e financeira  
+**Status:** direção aprovada; preços e cobrança ainda dependem de validação comercial/financeira
 **Data:** 4 de setembro de 2026  
 **Escopo:** licença da plataforma para organizações em modo BYOG/`CONNECTED`, sem comissão da plataforma sobre doações
 
@@ -18,14 +18,14 @@ Essa estrutura combina previsibilidade para a ONG com uma forma proporcional de 
 
 O schema ainda possui os modos `CONNECTED` e `MANAGED`, além de `Plan.platformFeeBps`. O modo `MANAGED` permite split em que a plataforma retém percentual; isso é incompatível com a promessa de zero comissão feita neste plano.
 
-Até uma decisão comercial formal, a regra é:
+Regra vigente após a decisão comercial:
 
 - **BYOG/`CONNECTED`:** modelo principal deste documento; mensalidade fixa; `platformFeeBps` e `platformFeeCents` devem ser zero para a plataforma;
-- **`MANAGED`:** não faz parte desta tabela de preços. Deve ser removido da oferta ou documentado como produto paralelo, com contrato e precificação próprios;
+- **`MANAGED`:** descontinuado; não é criado nem aceito pelo fluxo de pagamentos;
 - nunca registrar uma taxa percentual em BYOG só porque ela existe no plano cadastrado;
 - não apresentar a tabela ao cliente como se a automação de volume, upgrade ou cobrança já estivesse implementada.
 
-A decisão sobre o destino do `MANAGED` é bloqueadora para o contrato comercial e aparece novamente na seção 11.
+A decisão foi tomada: `MANAGED` está descontinuado como oferta. O enum legado permanece apenas para permitir migração segura de registros antigos; o resolver rejeita esse modo, novas conexões gravam sempre `CONNECTED` e o webhook global legado responde `410`. Antes de produção, registros antigos devem ser migrados ou desconectados.
 
 ## 2. Princípios comerciais
 
@@ -179,7 +179,7 @@ Indicadores mensais:
 
 ## 9. Requisitos para implementar a cobrança
 
-O que segue é trabalho de uma segunda fase de produto. No estado atual, a organização escolhe o plano manualmente, não existe ledger mensal de volume, não há histerese automática nem assinatura de mensalidade separada. A ordem segura é validar o preço com clientes antes de automatizar.
+O que segue é trabalho de uma segunda fase de produto. A proteção contra upgrade gratuito e a remoção da taxa fantasma já foram aplicadas: mudanças self-service ficam bloqueadas até existir cobrança confirmada e todos os fluxos de doação calculam taxa da plataforma igual a zero. Ainda não existe ledger mensal de volume, histerese automática nem assinatura de mensalidade separada. A ordem segura continua sendo validar o preço com clientes antes de automatizar.
 
 ### Dados e domínio
 
@@ -230,7 +230,7 @@ O modelo estará pronto para piloto quando:
 8. O que acontece com a organização inadimplente: somente modo leitura, suspensão de novas campanhas ou outra política?
 9. Qual entidade emitirá nota fiscal e como será tratado o imposto?
 10. A cobrança da licença será feita pelo próprio Pagar.me ou por outro provedor?
-11. O modo `MANAGED` será descontinuado, mantido como oferta paralela ou convertido integralmente para mensalidade?
+11. (Decidido) O modo `MANAGED` foi descontinuado; novas conexões são exclusivamente `CONNECTED`/BYOG.
 
 ## 12. Ordem de implantação
 
@@ -240,7 +240,7 @@ O modelo estará pronto para piloto quando:
 - apresentar a tabela sem negociar durante a primeira conversa;
 - medir disposição de pagamento, recursos indispensáveis e sazonalidade;
 - escolher 2–3 clientes-piloto.
-- decidir se `MANAGED` permanece como produto separado antes de publicar contrato;
+- registrar a decisão de descontinuação de `MANAGED` no contrato, onboarding e materiais comerciais;
 - confirmar com contabilidade/contrato que BYOG não terá `platformFeeBps` nem `platformFeeCents`.
 
 ### Fase 2 — Instrumentação
@@ -266,8 +266,8 @@ O modelo estará pronto para piloto quando:
 
 ## 13. Relação com a auditoria técnica
 
-Este plano substitui a ideia anterior de taxa transacional da plataforma no modo BYOG. A implementação deve corrigir a divergência apontada em `AUD-004` do [relatório de auditoria](./AUDIT-2026-09-04.md): `platformFeeCents` não pode representar uma receita que não existe. O bloqueio de upgrade sem pagamento confirmado (`AUD-005`) continua necessário, mesmo antes da automação do novo modelo.
+Este plano substitui a ideia anterior de taxa transacional da plataforma. A implementação corrigiu as divergências apontadas em `AUD-004` e `AUD-005` do [relatório de auditoria](./AUDIT-2026-09-04.md): no BYOG, `platformFeeCents` é sempre zero e a troca de plano não é aplicada sem confirmação da mensalidade.
 
-O plano não autoriza implementar imediatamente ledger, histerese ou cobrança automática. Esses itens só devem começar depois da validação comercial da Fase 1 e da decisão sobre `MANAGED`.
+O plano não autoriza implementar imediatamente ledger, histerese ou cobrança automática. Esses itens só devem começar depois da validação comercial da Fase 1 e da definição do provedor de cobrança recorrente.
 
 Este documento é uma proposta de produto e não substitui validação contábil, tributária, contratual ou jurídica.

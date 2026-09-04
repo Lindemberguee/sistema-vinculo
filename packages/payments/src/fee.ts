@@ -1,17 +1,24 @@
 import { assertCents, type Cents } from "@donation/shared";
 
-/** Fee configuration, taken from the org's Plan row. */
+/** Legacy fee configuration. Production donations use BYOG_FEE_CONFIG. */
 export interface FeeConfig {
-  /** Platform fee in basis points. 490 => 4.90%. */
+  /** Legacy platform fee in basis points. 490 => 4.90%. */
   platformFeeBps: number;
-  /** Flat platform fee added on top, in cents. */
+  /** Legacy flat platform fee added on top, in cents. */
   platformFeeFixedCents: Cents;
 }
+
+/**
+ * BYOG/CONNECTED pricing: the platform charges no percentage or fixed fee on
+ * donations. The gateway may still charge its own processing fee directly to
+ * the organization's account.
+ */
+export const BYOG_FEE_CONFIG: FeeConfig = Object.freeze({ platformFeeBps: 0, platformFeeFixedCents: 0 });
 
 export interface FeeInput {
   /** Gross donation amount (what the donor intends the org to receive). */
   amountCents: Cents;
-  /** Optional "cover the fee" tip. Applied against the platform fee first. */
+  /** Optional contribution added to the donation total. */
   tipCents?: Cents;
   config: FeeConfig;
 }
@@ -21,13 +28,13 @@ export interface FeeBreakdown {
   tipCents: Cents;
   /** Total the donor is charged: amount + tip. */
   chargeTotalCents: Cents;
-  /** The platform fee. Equal to `platformFeeCents` — kept for readability. */
+  /** Legacy platform fee. Always zero with `BYOG_FEE_CONFIG`. */
   grossPlatformFeeCents: Cents;
-  /** Platform's split leg — the platform always keeps its fee. */
+  /** Legacy platform split leg; zero for BYOG. */
   platformFeeCents: Cents;
-  /** How much of the fee the org actually absorbed (0 once the tip covers it). Display only. */
+  /** Legacy display field for fee absorbed by the organization. */
   orgFeeBorneCents: Cents;
-  /** Amount routed to the org's recipient in the split. */
+  /** Amount routed to the organization's gateway account. */
   netToOrgCents: Cents;
 }
 
@@ -37,13 +44,12 @@ export interface FeeBreakdown {
  *
  * Model:
  *   chargeTotal   = amount + tip
- *   platformFee   = ceil(amount * bps / 10_000) + fixed   // platform ALWAYS keeps this
+ *   platformFee   = ceil(amount * bps / 10_000) + fixed   // legacy only
  *   netToOrg      = chargeTotal - platformFee              // = amount + tip - platformFee
  *   orgFeeBorne   = max(0, platformFee - tip)              // what the fee cost the org (display)
  *
- * A "cover the fee" tip funds the platform fee so the donation reaches the org
- * at 100% — it does NOT waive the platform's revenue. The two split legs
- * (netToOrg, platformFee) always sum to chargeTotal.
+ * In BYOG, `bps` and `fixed` are zero, so the organization's account receives
+ * the full charge total (less only fees charged by its own gateway).
  */
 export function calculateFees({ amountCents, tipCents = 0, config }: FeeInput): FeeBreakdown {
   assertCents(amountCents, "amountCents");
@@ -86,7 +92,7 @@ export function calculateFees({ amountCents, tipCents = 0, config }: FeeInput): 
   };
 }
 
-/** Build the Pagar.me `split` array from a breakdown. */
+/** Build the legacy managed Pagar.me `split` array. BYOG flows always send `[]`. */
 export function buildSplit(params: {
   breakdown: FeeBreakdown;
   orgRecipientId: string;

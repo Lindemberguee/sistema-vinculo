@@ -63,7 +63,7 @@ export const EDITOR_FIELDS: Record<BlockType, Field[]> = {
   ],
   donationCheckout: [
     { key: "allowRecurring", label: "Permitir doação mensal", kind: "checkbox" },
-    { key: "allowTip", label: "Oferecer cobrir a taxa", kind: "checkbox" },
+    { key: "allowTip", label: "Permitir contribuição extra", kind: "checkbox" },
     { key: "tipLabel", label: "Texto da gorjeta", kind: "text" },
   ],
   sponseeGrid: [

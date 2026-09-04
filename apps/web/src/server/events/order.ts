@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { prisma, resolveOrgGateway, type PaymentMethod } from "@donation/db";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@donation/shared";
-import { buildSplit, calculateFees, PLATFORM_RECIPIENT_ID, type CreateOrderInput } from "@donation/payments";
+import { BYOG_FEE_CONFIG, calculateFees, type CreateOrderInput } from "@donation/payments";
 import { applySyncPaidAggregates, notifySyncPaid } from "@/server/donations/sync-paid";
 import { computeOrderCents, validateOrderItems, type TypeInfo } from "./logic";
 
@@ -27,13 +27,13 @@ export interface EventOrderParams {
 export async function createEventOrder(params: EventOrderParams) {
   const org = await prisma.organization.findUnique({
     where: { id: params.organizationId },
-    select: { id: true, displayName: true, slug: true, status: true, gatewayRecipientId: true, planId: true },
+    select: { id: true, displayName: true, slug: true, status: true, planId: true },
   });
   if (!org) throw new NotFoundError("Organization");
   if (org.status !== "ACTIVE") {
     throw new ForbiddenError("This organization is not yet able to receive payments");
   }
-  const { gateway, mode } = await resolveOrgGateway(org.id);
+  const { gateway } = await resolveOrgGateway(org.id);
 
   const event = await prisma.event.findFirst({
     where: { id: params.eventId, organizationId: org.id },
@@ -56,14 +56,10 @@ export async function createEventOrder(params: EventOrderParams) {
   if (!v.ok) throw new ValidationError(v.reason);
 
   const amountCents = computeOrderCents(items, typeInfo);
-  const plan = await prisma.plan.findUniqueOrThrow({
-    where: { id: org.planId },
-    select: { platformFeeBps: true, platformFeeFixedCents: true },
-  });
   const fees = calculateFees({
     amountCents,
     tipCents: params.tipCents,
-    config: { platformFeeBps: plan.platformFeeBps, platformFeeFixedCents: plan.platformFeeFixedCents },
+    config: BYOG_FEE_CONFIG,
   });
 
   const documentHash = params.donor.document
@@ -118,12 +114,7 @@ export async function createEventOrder(params: EventOrderParams) {
       }
     });
   } catch (err) {
-    // best-effort rollback of any sold increments (the tx already rolled the rows back)
-    await Promise.all(
-      claimedTypes.map((c) =>
-        prisma.eventTicketType.updateMany({ where: { id: c.ticketTypeId }, data: { sold: { decrement: c.quantity } } }),
-      ),
-    ).catch(() => {});
+    // The database transaction already rolled back all increments and tickets.
     throw err;
   }
 
@@ -132,10 +123,7 @@ export async function createEventOrder(params: EventOrderParams) {
     donationId,
     method: params.method,
     chargeTotalCents: fees.chargeTotalCents,
-    split:
-      mode === "MANAGED" && org.gatewayRecipientId
-        ? buildSplit({ breakdown: fees, orgRecipientId: org.gatewayRecipientId, platformRecipientId: PLATFORM_RECIPIENT_ID() })
-        : [],
+    split: [],
     customer: {
       name: params.donor.name,
       email: params.donor.email,

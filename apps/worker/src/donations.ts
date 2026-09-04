@@ -18,7 +18,7 @@ const METHOD_LABEL: Record<string, string> = {
   BOLETO: "Boleto",
 };
 const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
-import { calculateFees } from "@donation/payments";
+import { BYOG_FEE_CONFIG, calculateFees } from "@donation/payments";
 import { emitEvent } from "./events";
 
 const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
@@ -208,14 +208,10 @@ export async function recordSubscriptionCharge(params: {
     return "noop";
   }
 
-  const feeCfg = await prisma.plan.findUniqueOrThrow({
-    where: { id: plan.organization.planId },
-    select: { platformFeeBps: true, platformFeeFixedCents: true },
-  });
   const fees = calculateFees({
     amountCents: plan.amountCents,
     tipCents: plan.tipCents,
-    config: { platformFeeBps: feeCfg.platformFeeBps, platformFeeFixedCents: feeCfg.platformFeeFixedCents },
+    config: BYOG_FEE_CONFIG,
   });
 
   await prisma.$transaction(async (tx) => {

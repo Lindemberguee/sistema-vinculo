@@ -10,44 +10,24 @@ export {
   type IntlWebhookEvent,
 } from "./gateways/stripe";
 
-import { PagarmeGateway } from "./gateways/pagarme";
 import { MockGateway, isMockGateway } from "./gateways/mock";
 import { StripeGateway } from "./gateways/stripe";
 import type { PaymentGateway } from "./types";
 
 let singleton: PaymentGateway | undefined;
 
-/** Returns the configured gateway. Swap the implementation here to change providers. */
+/**
+ * @deprecated Global gateway access belonged to the removed MANAGED flow.
+ * Keep the symbol for backwards-compatible imports, but fail closed in
+ * production so no new code can accidentally charge through the platform.
+ */
 export function getGateway(): PaymentGateway {
   if (singleton) return singleton;
   if (isMockGateway()) {
     singleton = new MockGateway();
     return singleton;
   }
-  const secretKey = process.env.PAGARME_SECRET_KEY;
-  const webhookSecret = process.env.PAGARME_WEBHOOK_SECRET;
-  if (!secretKey || !webhookSecret) {
-    throw new Error("PAGARME_SECRET_KEY / PAGARME_WEBHOOK_SECRET are not set");
-  }
-  singleton = new PagarmeGateway({ secretKey, webhookSecret });
-  return singleton;
-}
-
-export const PLATFORM_RECIPIENT_ID = () => {
-  const id = process.env.PLATFORM_RECIPIENT_ID;
-  if (!id) throw new Error("PLATFORM_RECIPIENT_ID is not set");
-  return id;
-};
-
-/**
- * Whether the Pagar.me account is enabled for split (marketplace). Until it is,
- * `PLATFORM_RECIPIENT_ID` stays as the `rp_placeholder` sentinel and charges are
- * created without a `split[]` — money lands on the account's own balance. Set a
- * real `rp_...` once Pagar.me enables recipient creation on the account.
- */
-export function isSplitEnabled(): boolean {
-  const id = process.env.PLATFORM_RECIPIENT_ID ?? "";
-  return id.startsWith("rp_") && !id.includes("placeholder");
+  throw new Error("O gateway global foi descontinuado. Use a conexão BYOG da organização.");
 }
 
 let intlSingleton: StripeGateway | undefined;

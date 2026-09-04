@@ -29,7 +29,6 @@ export default async function AdminHome() {
       cnpj: true,
       status: true,
       kycStatus: true,
-      gatewayRecipientId: true,
       kyc: {
         select: { contactEmail: true, legalRepName: true, legalRepDocument: true, bankAccount: true, rejectionReason: true },
       },
@@ -71,7 +70,7 @@ export default async function AdminHome() {
                 CNPJ {o.cnpj} · {o.kyc?.contactEmail} · resp. {o.kyc?.legalRepName} ({o.kyc?.legalRepDocument})
               </div>
               <div className="text-sm text-muted">
-                status: {o.status} · recebedor: {o.gatewayRecipientId ?? "—"}
+                status: {o.status} · pagamentos: conta própria da organização
               </div>
               {o.kyc?.rejectionReason && (
                 <div className="text-sm text-danger">Recusa anterior: {o.kyc.rejectionReason}</div>

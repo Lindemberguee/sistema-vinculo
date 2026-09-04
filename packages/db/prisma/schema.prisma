@@ -189,10 +189,11 @@ enum PaymentProvider {
 }
 
 /// CONNECTED = the org brought its own gateway account (BYOG); we never touch
-/// the money, revenue is the monthly plan. MANAGED = platform-as-facilitator
-/// with split (needs a marketplace-enabled platform account).
+/// the money, revenue is the monthly plan. MANAGED is retained only as a
+/// backward-compatible value for legacy rows and is rejected by the resolver.
 enum PaymentMode {
   CONNECTED
+  /// @deprecated Platform-facilitator/split mode is no longer offered.
   MANAGED
 }
 
@@ -402,7 +403,7 @@ model Plan {
   id                     String  @id // free | essencial | pro | enterprise
   name                   String
   monthlyCents           Int     @default(0)
-  /// Platform fee in basis points (490 = 4.90%). Applied per paid donation.
+  /// Legacy field kept for schema compatibility; BYOG plans must keep this at 0.
   platformFeeBps         Int
   platformFeeFixedCents  Int     @default(0)
   /// { maxCampaigns, maxUsers, customDomain: bool, removeBranding: bool, modules: string[] }

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { prisma, renderOrgEmail, resolveOrgGateway, resolveOrgSender } from "@donation/db";
 import { formatBRL } from "@donation/shared";
-import { buildSplit, calculateFees, PLATFORM_RECIPIENT_ID } from "@donation/payments";
+import { BYOG_FEE_CONFIG, calculateFees } from "@donation/payments";
 import { sendEmail } from "@donation/emails";
 
 const nm = (n: string) => n.trim().split(/\s+/)[0] || n;
@@ -29,8 +29,6 @@ async function billWinner(params: {
   bidCents: number;
   orgName: string;
   orgSlug: string;
-  orgPlanId: string;
-  orgRecipientId: string | null;
 }): Promise<boolean> {
   let resolved;
   try {
@@ -41,24 +39,17 @@ async function billWinner(params: {
   }
 
   try {
-    const feeCfg = await prisma.plan.findUniqueOrThrow({
-      where: { id: params.orgPlanId },
-      select: { platformFeeBps: true, platformFeeFixedCents: true },
-    });
     const fees = calculateFees({
       amountCents: params.bidCents,
       tipCents: 0,
-      config: { platformFeeBps: feeCfg.platformFeeBps, platformFeeFixedCents: feeCfg.platformFeeFixedCents },
+      config: BYOG_FEE_CONFIG,
     });
     const donationId = randomUUID();
     const order = await resolved.gateway.createOrder({
       donationId,
       method: "PIX",
       chargeTotalCents: fees.chargeTotalCents,
-      split:
-        resolved.mode === "MANAGED" && params.orgRecipientId
-          ? buildSplit({ breakdown: fees, orgRecipientId: params.orgRecipientId, platformRecipientId: PLATFORM_RECIPIENT_ID() })
-          : [],
+      split: [],
       customer: { name: params.donorName, email: params.donorEmail },
       expiresInSeconds: PIX_TTL_DAYS * 86_400,
       metadata: { kind: "auction", lotId: params.lotId },
@@ -137,7 +128,7 @@ export async function settleEndedLots(): Promise<{ settled: number; sold: number
 
     const org = await prisma.organization.findUnique({
       where: { id: lot.organizationId },
-      select: { displayName: true, slug: true, status: true, gatewayRecipientId: true, planId: true },
+      select: { displayName: true, slug: true, status: true },
     });
     const donor = await prisma.donor.findUnique({
       where: { id: lot.currentBidderDonorId },
@@ -166,8 +157,6 @@ export async function settleEndedLots(): Promise<{ settled: number; sold: number
       bidCents: lot.currentBidCents,
       orgName: org.displayName,
       orgSlug: org.slug,
-      orgPlanId: org.planId,
-      orgRecipientId: org.gatewayRecipientId,
     });
   }
 
@@ -210,7 +199,7 @@ export async function chaseUnpaidLots(): Promise<{ reminded: number; reoffered: 
 
     const org = await prisma.organization.findUnique({
       where: { id: lot.organizationId },
-      select: { displayName: true, slug: true, status: true, gatewayRecipientId: true, planId: true },
+      select: { displayName: true, slug: true, status: true },
     });
     if (!org) continue;
 
@@ -282,8 +271,6 @@ export async function chaseUnpaidLots(): Promise<{ reminded: number; reoffered: 
           bidCents: runnerUp.amountCents,
           orgName: org.displayName,
           orgSlug: org.slug,
-          orgPlanId: org.planId,
-          orgRecipientId: org.gatewayRecipientId,
         });
         if (ok) {
           await prisma.auditLog.create({

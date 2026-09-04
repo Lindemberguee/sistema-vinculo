@@ -16,7 +16,6 @@ export default async function OrgSettings({ params }: { params: Promise<{ orgId:
       status: true,
       kycStatus: true,
       planId: true,
-      gatewayRecipientId: true,
       _count: { select: { kycDocuments: true } },
       emailConfig: { select: { fromName: true, replyTo: true, domainStatus: true } },
       kyc: { select: { contactEmail: true } },
@@ -30,11 +29,9 @@ export default async function OrgSettings({ params }: { params: Promise<{ orgId:
 
       <div className="grid gap-4">
         <KycCard
-          orgId={orgId}
           orgStatus={org.status}
           kycStatus={org.kycStatus}
           docCount={org._count.kycDocuments}
-          hasRecipient={Boolean(org.gatewayRecipientId)}
         />
 
         <EmailSenderCard

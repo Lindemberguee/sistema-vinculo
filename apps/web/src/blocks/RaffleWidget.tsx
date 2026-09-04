@@ -226,7 +226,7 @@ export function RaffleWidget(props: RaffleWidgetProps) {
         </div>
       )}
 
-      {props.allowTip && (
+      {props.allowTip && props.platformFeeBps > 0 && (
         <label className="mt-2 flex items-center gap-2 text-sm">
           <input type="checkbox" className="size-4 accent-brand-600" checked={coverFee} onChange={(e) => setCoverFee(e.target.checked)} />
           {props.tipLabel} (+{brl(tipCents)})
