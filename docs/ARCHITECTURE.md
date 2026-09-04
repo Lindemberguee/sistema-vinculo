@@ -192,15 +192,17 @@ Grupos obrigatórios ou condicionais:
 | --- | --- |
 | Banco e fila | `DATABASE_URL`, `DIRECT_URL`, `REDIS_URL`, `DB_RLS` |
 | Auth e hosts | `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `APP_BASE_DOMAIN`, credenciais Google |
-| Pagar.me gerenciado | `PAGARME_SECRET_KEY`, `PAGARME_PUBLIC_KEY`, `PAGARME_WEBHOOK_SECRET`, `PLATFORM_RECIPIENT_ID` |
-| Gateways conectados | `PAYMENTS_ENC_KEY` |
+| Gateway BYOG por organização | `PAYMENTS_ENC_KEY` (credenciais cifradas por organização) |
+| Variáveis legadas (não usar em novas conexões) | `PAGARME_SECRET_KEY`, `PAGARME_PUBLIC_KEY`, `PAGARME_WEBHOOK_SECRET`, `PLATFORM_RECIPIENT_ID` |
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
 | E-mail | `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `EMAIL_FROM`, `EMAIL_SENDING_DOMAIN` |
 | Storage | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION` |
 | Administração | `PLATFORM_ADMIN_EMAILS` |
 | Observabilidade | `SENTRY_DSN` |
 
-No ambiente analisado, Pagar.me, Stripe, Resend webhook, S3, Google e Sentry estavam sem configuração. O app consegue iniciar com vários desses recursos desativados, mas o endpoint Resend aceita mensagens sem assinatura quando o segredo está ausente; isso precisa ser corrigido antes de exposição pública.
+O modo de pagamentos suportado é BYOG/`CONNECTED`: cada organização fornece e recebe diretamente no próprio gateway. As variáveis Pagar.me globais acima permanecem apenas para detecção e migração de instalações antigas; o webhook global retorna `410 Gone` quando elas estão configuradas. Novas conexões nunca usam uma conta da plataforma.
+
+No ambiente analisado, Stripe, Resend webhook, S3, Google e Sentry estavam sem configuração. O app consegue iniciar com vários desses recursos desativados, mas o endpoint Resend aceita mensagens sem assinatura quando o segredo está ausente; isso precisa ser corrigido antes de exposição pública.
 
 ## 11. Comandos de desenvolvimento
 
@@ -243,7 +245,7 @@ Em 04/09/2026:
 - build de produção do Next.js: aprovado;
 - TypeScript `--noEmit` nos sete pacotes/apps: aprovado;
 - Prisma schema validate: aprovado, com aviso de configuração que será removida no Prisma 7;
-- testes: 17 arquivos e 129 casos aprovados;
+- testes: 21 arquivos e 153 casos aprovados (121 web, 19 payments, 7 blocks, 6 shared; contagem atual após os testes de BYOG e datas mensais);
 - lint: não operacional;
 - cobertura: não configurada;
 - testes de worker, integração com banco/Redis e E2E: ausentes.

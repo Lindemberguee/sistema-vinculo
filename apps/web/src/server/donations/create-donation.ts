@@ -3,9 +3,8 @@ import { prisma, Prisma, renderOrgEmail, resolveOrgSender, type PaymentMethod } 
 import { addInterval, ForbiddenError, formatBRL, NotFoundError, ValidationError } from "@donation/shared";
 import { sendEmail } from "@donation/emails";
 import {
-  buildSplit,
+  BYOG_FEE_CONFIG,
   calculateFees,
-  PLATFORM_RECIPIENT_ID,
   type CreateOrderInput,
 } from "@donation/payments";
 import { getOrgGateway } from "@/server/payments/resolve";
@@ -59,7 +58,7 @@ const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
 export async function createDonation(params: CreateDonationParams) {
   const org = await prisma.organization.findUnique({
     where: { id: params.organizationId },
-    select: { id: true, displayName: true, status: true, gatewayRecipientId: true, planId: true },
+    select: { id: true, displayName: true, status: true, planId: true },
   });
   if (!org) throw new NotFoundError("Organization");
   if (org.status !== "ACTIVE") {
@@ -68,8 +67,6 @@ export async function createDonation(params: CreateDonationParams) {
   // Resolve the org's gateway (BYOG) — throws if it hasn't connected/verified one.
   const resolved = await getOrgGateway(org.id);
   const gateway = resolved.gateway;
-  // Split only in MANAGED (platform-as-facilitator) mode with a recipient set.
-  const splitEnabled = resolved.mode === "MANAGED" && Boolean(org.gatewayRecipientId);
 
   const campaign = await prisma.campaign.findUnique({
     where: { organizationId_slug: { organizationId: org.id, slug: params.campaignSlug } },
@@ -154,15 +151,10 @@ export async function createDonation(params: CreateDonationParams) {
         }
       : { dedicationTo: null, dedicationMessage: null };
 
-  const plan = await prisma.plan.findUniqueOrThrow({
-    where: { id: org.planId },
-    select: { platformFeeBps: true, platformFeeFixedCents: true },
-  });
-
   const fees = calculateFees({
     amountCents: params.amountCents,
     tipCents,
-    config: { platformFeeBps: plan.platformFeeBps, platformFeeFixedCents: plan.platformFeeFixedCents },
+    config: BYOG_FEE_CONFIG,
   });
 
   // Upsert donor within the org.
@@ -189,26 +181,10 @@ export async function createDonation(params: CreateDonationParams) {
     select: { id: true },
   });
 
-  const split =
-    splitEnabled && org.gatewayRecipientId
-      ? buildSplit({
-          breakdown: fees,
-          orgRecipientId: org.gatewayRecipientId,
-          platformRecipientId: PLATFORM_RECIPIENT_ID(),
-        })
-      : [];
+  const split: CreateOrderInput["split"] = [];
 
   const recurringCard = wantsRecurring && params.method === "CREDIT_CARD";
   const recurringPix = wantsRecurring && params.method === "PIX";
-
-  async function claimSponsee() {
-    const s = sponsee;
-    if (!s) return;
-    await prisma.sponsee.updateMany({
-      where: { id: s.id, status: { in: ["AVAILABLE", "SPONSORED"] } },
-      data: { status: "SPONSORED", sponsorDonorId: donor.id, sponsoredAt: new Date() },
-    });
-  }
 
   // ── Card subscription: no Donation row now — the `subscription.charged`
   //    webhook creates one per cycle (including the first). ─────────────
@@ -247,7 +223,6 @@ export async function createDonation(params: CreateDonationParams) {
     });
 
     await prisma.recurringPlan.update({ where: { id: planRow.id }, data: { gatewaySubscriptionId: subscriptionId } });
-    await claimSponsee();
 
     return {
       donation: { id: planRow.id, status: "PENDING" as const, paymentDetails: null },
@@ -278,7 +253,6 @@ export async function createDonation(params: CreateDonationParams) {
       select: { id: true },
     });
     recurringPlanId = planRow.id;
-    await claimSponsee();
   }
 
   const donationId = randomUUID();

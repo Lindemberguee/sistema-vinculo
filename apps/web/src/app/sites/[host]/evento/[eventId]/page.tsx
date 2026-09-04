@@ -50,7 +50,7 @@ export default async function PublicEventPage({
   const branding = (event.organization.branding ?? {}) as { logoUrl?: string; primaryColor?: string };
   const accent = branding.primaryColor ?? DEFAULT_ACCENT;
   const [plan, pay] = await Promise.all([
-    prisma.plan.findUnique({ where: { id: event.organization.planId }, select: { platformFeeBps: true } }),
+    prisma.plan.findUnique({ where: { id: event.organization.planId }, select: { id: true } }),
     resolveOrgPublicKey(tenant.organizationId),
   ]);
 
@@ -86,8 +86,8 @@ export default async function PublicEventPage({
                 maxPerOrder: t.maxPerOrder,
               }))}
               allowTip
-              tipLabel="Quero cobrir a taxa da plataforma"
-              platformFeeBps={plan?.platformFeeBps ?? 490}
+              tipLabel="Adicionar uma contribuição extra à causa"
+              platformFeeBps={0}
               pagarmePublicKey={pay.publicKey}
               accentColor={accent}
             />

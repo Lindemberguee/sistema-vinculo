@@ -441,7 +441,7 @@ async function main() {
         methods: ["PIX", "CREDIT_CARD", "BOLETO"],
         allowRecurring: true,
         allowTip: true,
-        tipLabel: "Quero cobrir a taxa da plataforma",
+        tipLabel: "Adicionar uma contribuição extra à causa",
       },
     },
     { id: "ambassadors", type: "ambassadorLeaderboard", props: { title: "Embaixadores da campanha", limit: 5, showJoinCta: true } },

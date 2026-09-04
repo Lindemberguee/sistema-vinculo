@@ -40,12 +40,14 @@ Memberships e papéis são copiados para o JWT no login e em uma atualização e
 
 | Plano | Mensalidade | Taxa configurada | Campanhas | Usuários | Módulos |
 | --- | ---: | ---: | ---: | ---: | --- |
-| Free | R$ 0 | 6,90% | 1 | 2 | núcleo |
-| Essencial | R$ 99 | 4,90% | ilimitadas | 5 | CRM |
-| Pro | R$ 299 | 3,90% | ilimitadas | 10 | todos os módulos listados |
-| Enterprise | negociado | 2,90% | ilimitadas | ilimitados | todos |
+| Inicial | R$ 99 | 0% | 1 | 2 | núcleo |
+| Essencial | R$ 249 | 0% | ilimitadas | 5 | CRM |
+| Crescimento | R$ 549 | 0% | ilimitadas | 10 | todos os módulos listados |
+| Profissional | R$ 999 | 0% | ilimitadas | 25 | todos os módulos listados |
+| Escala | R$ 1.799 | 0% | ilimitadas | 50 | todos os módulos listados |
+| Enterprise | a partir de R$ 2.990 | 0% | ilimitadas | ilimitados | todos |
 
-Esses valores vêm do seed e conflitam com `doc.md`, que propõe BYOG com mensalidade de R$ 600–800 e taxa de plataforma de 0%. Nenhum valor deve ser publicado comercialmente antes de uma decisão única de pricing.
+Esses valores vêm do seed atualizado conforme a proposta em `PLANO-MONETIZACAO.md`. `doc.md` ainda contém a proposta histórica de BYOG com mensalidade de R$ 600–800; não é fonte vigente.
 
 ### Limites implementados
 
@@ -57,7 +59,7 @@ Esses valores vêm do seed e conflitam com `doc.md`, que propõe BYOG com mensal
 
 ### Lacunas observadas
 
-- O proprietário pode trocar imediatamente para qualquer plano público sem cobrança.
+- A troca self-service de plano está bloqueada até existir cobrança confirmada da licença (`AUD-005`).
 - A cobrança mensal automática está declarada como futura no próprio código.
 - O status/período da `Subscription` não participa de `getOrgLimits()`.
 - Vários módulos só são escondidos na UI ou protegidos em algumas ações; CRM, links, embaixadores e internacional não têm guard central consistente.
@@ -129,20 +131,16 @@ orgFeeBorne = max(0, platformFee - tip)
 ```
 
 Há invariantes para impedir líquido não positivo e garantir que as pernas do split conciliem com o total.
+Essa fórmula permanece apenas como helper compatível com dados legados. Em produção, todos os planos BYOG usam `platformFeeBps = 0`, `platformFeeFixedCents = 0` e split vazio; a tarifa cobrada pelo gateway não é receita da plataforma.
 
 ### Modos de pagamento
 
 | Modo | Conta do gateway | Split |
 | --- | --- | --- |
 | `CONNECTED` / BYOG | Conta própria da organização | vazio |
-| `MANAGED` | Conta da plataforma | organização + plataforma |
+| `MANAGED` | — | descontinuado |
 
-No modo gerenciado, a plataforma absorve a taxa de processamento do gateway segundo as opções de split.
-
-No modo conectado, o gateway recebe split vazio e deposita o valor na conta da organização. Entretanto, o banco ainda registra `platformFeeCents` e `netToOrgCents` calculados pelo plano. Isso cria taxa fantasma e líquido contábil diferente do repasse real. A decisão obrigatória é uma destas:
-
-1. BYOG é mensalidade sem percentual: zerar taxa da plataforma, registrar fee real do gateway e calcular líquido real.
-2. BYOG também paga percentual: implementar cobrança efetiva e conciliação dessa receita por um mecanismo compatível com o gateway/contrato.
+O modo `MANAGED` foi descontinuado. No modo conectado, o gateway recebe split vazio e deposita o valor na conta da organização. O código calcula `platformFeeCents = 0` e `netToOrgCents = amountCents + tipCents`; a tarifa do gateway continua fora do ledger da plataforma. A monetização da plataforma é a mensalidade.
 
 ## 6. Máquina de estados da doação
 
@@ -176,7 +174,7 @@ O arquivo de máquina de estados existe, mas o worker não o usa. Assim, um even
 
 ### Entrada
 
-- Pagar.me gerenciado: autenticação Basic configurada na plataforma.
+- Pagar.me BYOG: cada organização configura sua própria conta e segredo; não há autenticação global para novas conexões.
 - Pagar.me conectado: endpoint por organização e segredo próprio.
 - Stripe: assinatura oficial do webhook.
 - Resend: assinatura Svix quando o segredo está configurado.
@@ -204,13 +202,11 @@ ACTIVE -> PAST_DUE -> CANCELED
 
 Após três falhas, o plano é cancelado. No cartão, o código tenta cancelar no gateway; no Pix, o próprio worker cria QR codes mensais.
 
-Problemas observados:
+Pendências ainda abertas:
 
-- cancelamento no gateway pode falhar e ser ignorado; mesmo assim o plano local vira `CANCELED` e o usuário recebe confirmação;
-- uma cobrança posterior de cartão aceita plano cancelado e o reativa como `ACTIVE`;
+- retry/DLQ e estado explícito `CANCEL_PENDING` ainda não existem para indisponibilidade prolongada do gateway;
 - criação da recorrência ocorre antes de a operação externa terminar; falha pode deixar plano `ACTIVE` sem assinatura ou Pix inicial;
 - apadrinhamento Pix pode ficar reservado mesmo após erro de criação da cobrança;
-- `addInterval()` usa `Date.setMonth`, fazendo 31 de janeiro avançar para março em alguns anos.
 
 Regra recomendada: introduzir estados `CREATING`, `ACTIVE`, `PAST_DUE`, `CANCEL_PENDING`, `CANCELED`, registrar cada comando externo com idempotência e só confirmar cancelamento após resposta/webhook do gateway.
 
@@ -218,11 +214,11 @@ Regra recomendada: introduzir estados `CREATING`, `ACTIVE`, `PAST_DUE`, `CANCEL_
 
 Uma seleção de apadrinhamento força recorrência mensal e aceita Pix ou cartão. O afilhado é associado ao doador da recorrência e volta a `AVAILABLE` quando o plano termina.
 
-O código atual aceita selecionar um afilhado já `SPONSORED` e sobrescreve o patrocinador. A reserva também não testa atomicamente o resultado do update. A regra correta precisa ser:
+O código valida disponibilidade no checkout e o claim agora ocorre somente após pagamento, com condição atômica `AVAILABLE` + patrocinador nulo. A regra vigente é:
 
 - somente `AVAILABLE` pode ser reservado;
-- claim condicional atômico com `count === 1`;
-- claim e criação da recorrência na mesma unidade de consistência local;
+- claim condicional atômico, sem sobrescrever patrocinador existente;
+- claim somente após confirmação do primeiro pagamento;
 - compensação segura se a operação no gateway falhar;
 - política explícita para troca de patrocinador e pagamentos atrasados.
 
@@ -244,9 +240,9 @@ DRAFT -> OPEN -> CLOSED -> DRAWN
 
 Números possuem unicidade `(raffleId, number)`, o que protege a corrida de reserva. Somente tickets `PAID` participam do sorteio.
 
-O resultado atual é `sha256(seed) mod quantidade`, aplicado à lista ordenada de tickets. Isso é reproduzível, mas não imparcial: o operador escolhe a seed depois de conhecer a lista e consegue testar seeds até selecionar qualquer índice. Uma solução auditável exige compromisso prévio da seed, fonte pública de entropia posterior ao fechamento ou serviço de aleatoriedade verificável.
+O resultado é `sha256(seed) mod quantidade`, aplicado à lista ordenada de tickets. A seed é gerada pelo servidor no fechamento, fica gravada antes do sorteio e a transição `CLOSED -> OPEN` é proibida; o operador não escolhe a seed após conhecer a lista.
 
-Boleto fica válido por três dias, mas a reserva é limpa após 24 horas. Um pagamento no segundo ou terceiro dia pode ser confirmado sem o número originalmente comprado.
+Boleto fica válido por três dias e a limpeza de reservas considera `expiresAt`/`dueAt` do pagamento; a janela de 24 horas não libera mais um boleto ainda válido.
 
 A operação de rifa e sua mecânica também exigem validação jurídica separada antes de lançamento.
 
@@ -254,7 +250,7 @@ A operação de rifa e sua mecânica também exigem validação jurídica separa
 
 O estoque é controlado por `EventTicketType.sold`, que inclui reservas e ingressos confirmados. A reserva usa update condicional e cria tickets na mesma transação.
 
-Há um erro confirmado na compensação: quando a transação falha, o banco já desfaz os incrementos, mas o catch decrementa `sold` novamente. O contador pode ficar abaixo do real e permitir overselling.
+Falhas dentro da transação revertem integralmente os incrementos; não há mais decremento duplicado no `catch`.
 
 Outras regras:
 
@@ -277,15 +273,14 @@ Lacunas:
 
 - identidade do licitante não é verificada; qualquer pessoa pode licitar com e-mail de terceiro;
 - não há depósito, pré-autorização ou limite acumulado contra abuso;
-- o lote vira `SOLD` antes da cobrança; se a cobrança falha antes de criar `donationId`, o job de cobrança posterior nunca o seleciona;
-- workers concorrentes podem liquidar o mesmo lote sem claim atômico;
-- cobrança criada no gateway antes de falha local pode ficar órfã.
+- o claim de liquidação agora é atômico e o lote não fica `SOLD` sem doação correspondente;
+- a cobrança usa identificador determinístico por lote/vencedor/lance para permitir retry idempotente; ainda é necessário conciliar cobranças órfãs no gateway.
 
 ## 14. Eventos de saída e integrações
 
 Webhooks de saída são assinados com HMAC-SHA256 e repetidos pelo BullMQ. A organização informa qualquer URL HTTPS.
 
-Regra de segurança necessária: bloquear destinos privados, loopback, link-local, redes reservadas, redirects e DNS rebinding; idealmente usar egress proxy e allowlist por IP resolvido. A validação atual de apenas `https://` não impede SSRF.
+O teste de endpoint bloqueia redes privadas, loopback, link-local, credenciais embutidas, portas arbitrárias e redirects. Ainda é necessário egress proxy/DNS pinning para eliminar completamente rebinding.
 
 ## 15. Decisões obrigatórias antes das próximas mudanças
 

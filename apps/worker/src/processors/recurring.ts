@@ -7,7 +7,7 @@ import {
   type ResolvedOrgGateway,
 } from "@donation/db";
 import { addInterval, formatBRL } from "@donation/shared";
-import { buildSplit, calculateFees, PLATFORM_RECIPIENT_ID } from "@donation/payments";
+import { BYOG_FEE_CONFIG, calculateFees } from "@donation/payments";
 import { sendEmail } from "@donation/emails";
 import { manageUrl } from "../donations";
 
@@ -42,7 +42,7 @@ export async function runPixRecurring(): Promise<{ due: number; charged: number;
     where: { method: "PIX", status: { in: ["ACTIVE", "PAST_DUE"] }, nextChargeAt: { lte: new Date(now) } },
     include: {
       donor: { select: { name: true, email: true } },
-      organization: { select: { displayName: true, status: true, gatewayRecipientId: true, planId: true } },
+      organization: { select: { displayName: true, status: true, planId: true } },
       donations: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true, createdAt: true } },
     },
     take: 200,
@@ -80,14 +80,10 @@ export async function runPixRecurring(): Promise<{ due: number; charged: number;
       continue;
     }
 
-    const feeCfg = await prisma.plan.findUniqueOrThrow({
-      where: { id: plan.organization.planId },
-      select: { platformFeeBps: true, platformFeeFixedCents: true },
-    });
     const fees = calculateFees({
       amountCents: plan.amountCents,
       tipCents: plan.tipCents,
-      config: { platformFeeBps: feeCfg.platformFeeBps, platformFeeFixedCents: feeCfg.platformFeeFixedCents },
+      config: BYOG_FEE_CONFIG,
     });
 
     try {
@@ -95,14 +91,7 @@ export async function runPixRecurring(): Promise<{ due: number; charged: number;
         donationId: `${plan.id}-${now}`,
         method: "PIX",
         chargeTotalCents: fees.chargeTotalCents,
-        split:
-          resolved.mode === "MANAGED" && plan.organization.gatewayRecipientId
-            ? buildSplit({
-                breakdown: fees,
-                orgRecipientId: plan.organization.gatewayRecipientId,
-                platformRecipientId: PLATFORM_RECIPIENT_ID(),
-              })
-            : [],
+        split: [],
         customer: { name: plan.donor.name, email: plan.donor.email },
         expiresInSeconds: 3 * 86_400,
         metadata: { recurringPlanId: plan.id, source: "pix-recurring" },

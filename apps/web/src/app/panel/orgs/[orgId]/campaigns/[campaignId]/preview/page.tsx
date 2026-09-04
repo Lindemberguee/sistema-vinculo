@@ -51,7 +51,7 @@ export default async function DraftPreview({
 
   const plan = await db.plan.findUnique({
     where: { id: c.organization.planId },
-    select: { platformFeeBps: true, limits: true },
+    select: { limits: true },
   });
   const pay = await resolveOrgPublicKey(orgId);
   const parsed = safeParseBlocks(c.page.blocks);
@@ -96,7 +96,7 @@ export default async function DraftPreview({
       allowAmbassadors: c.allowAmbassadors,
     },
     pagarmePublicKey: pay.publicKey,
-    platformFeeBps: plan?.platformFeeBps ?? 490,
+    platformFeeBps: 0,
     removeBranding: parsePlanLimits(plan?.limits).removeBranding,
   };
 

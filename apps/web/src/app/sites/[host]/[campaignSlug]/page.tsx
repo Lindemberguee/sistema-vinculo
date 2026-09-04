@@ -55,7 +55,7 @@ async function loadPage(hostParam: string, campaignSlug: string) {
 
   const plan = await prisma.plan.findUnique({
     where: { id: campaign.organization.planId },
-    select: { platformFeeBps: true, limits: true },
+    select: { limits: true },
   });
   const pay = await getOrgPublicPaymentInfo(tenant.organizationId);
 
@@ -81,7 +81,7 @@ async function loadPage(hostParam: string, campaignSlug: string) {
       allowAmbassadors: campaign.allowAmbassadors,
     },
     pagarmePublicKey: pay.publicKey,
-    platformFeeBps: plan?.platformFeeBps ?? 490,
+    platformFeeBps: 0,
     removeBranding: parsePlanLimits(plan?.limits).removeBranding,
   };
 

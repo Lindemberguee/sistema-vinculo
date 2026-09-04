@@ -72,25 +72,33 @@ export async function reconcilePendingDonations(): Promise<{ checked: number; up
     }
   }
 
-  // Sweep abandoned raffle reservations (>24h RESERVED, payment never landed).
-  const stale = await prisma.raffleTicket.deleteMany({
+  // Sweep abandoned reservations only after the payment instrument's own due
+  // date. Boletos are valid for 3 days, so a fixed 24h cutoff would release a
+  // number that can still be paid and create an oversell.
+  const staleCandidates = await prisma.raffleTicket.findMany({
     where: {
       status: "RESERVED",
       reservedAt: { lt: new Date(now - 24 * 3_600_000) },
       OR: [{ donationId: null }, { donation: { status: { notIn: ["PAID"] } } }],
     },
+    select: { id: true, donation: { select: { paymentDetails: true } } },
   });
-  if (stale.count) console.log(`reconcile: released ${stale.count} stale raffle reservations`);
+  const stale = staleCandidates.filter((t) => reservationDueExpired(t.donation?.paymentDetails, now));
+  if (stale.length) {
+    await prisma.raffleTicket.deleteMany({ where: { id: { in: stale.map((t) => t.id) } } });
+    console.log(`reconcile: released ${stale.length} stale raffle reservations`);
+  }
 
   // Sweep abandoned event reservations the same way (and give seats back).
-  const staleEvt = await prisma.eventTicket.findMany({
+  const staleEvtCandidates = await prisma.eventTicket.findMany({
     where: {
       status: "RESERVED",
       createdAt: { lt: new Date(now - 24 * 3_600_000) },
       OR: [{ donationId: null }, { donation: { status: { notIn: ["PAID"] } } }],
     },
-    select: { id: true, ticketTypeId: true },
+    select: { id: true, ticketTypeId: true, donation: { select: { paymentDetails: true } } },
   });
+  const staleEvt = staleEvtCandidates.filter((t) => reservationDueExpired(t.donation?.paymentDetails, now));
   if (staleEvt.length) {
     const byType = new Map<string, number>();
     for (const t of staleEvt) byType.set(t.ticketTypeId, (byType.get(t.ticketTypeId) ?? 0) + 1);
@@ -102,4 +110,11 @@ export async function reconcilePendingDonations(): Promise<{ checked: number; up
   }
 
   return { checked: pending.length, updated };
+}
+
+function reservationDueExpired(paymentDetails: unknown, now: number): boolean {
+  if (!paymentDetails || typeof paymentDetails !== "object") return true;
+  const details = paymentDetails as { expiresAt?: unknown; dueAt?: unknown };
+  const due = typeof details.expiresAt === "string" ? details.expiresAt : typeof details.dueAt === "string" ? details.dueAt : null;
+  return !due || Number.isNaN(Date.parse(due)) || Date.parse(due) < now;
 }

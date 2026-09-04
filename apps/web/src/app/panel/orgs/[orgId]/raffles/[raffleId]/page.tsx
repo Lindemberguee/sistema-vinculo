@@ -109,7 +109,7 @@ export default async function RaffleDetail({
             <CardBody>
               <h2 className="mb-2 text-sm font-semibold">Sorteio</h2>
               {raffle.status === "CLOSED" ? (
-                <RaffleDrawForm orgId={orgId} raffleId={raffleId} />
+                <RaffleDrawForm orgId={orgId} raffleId={raffleId} drawSeed={raffle.drawSeed} />
               ) : (
                 <p className="hint">
                   Feche as vendas para liberar o sorteio

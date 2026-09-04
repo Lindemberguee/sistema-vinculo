@@ -13,9 +13,15 @@ DO $$
 DECLARE
   t text;
   org_tables text[] := ARRAY[
-    'Organization','OrganizationKyc','Membership','CustomDomain','Subscription',
-    'Campaign','Page','Donor','Donation','RecurringPlan','Payout','KycDocument',
-    'Export','OutboundWebhook','WebhookDelivery','AuditLog'
+    'Organization','OrganizationKyc','OrganizationPaymentConfig','Invitation',
+    'Membership','CustomDomain','Subscription','Campaign','DonationLink',
+    'CampaignAmbassador','CampaignReward','CampaignReport','CampaignUpdate','Page',
+    'Donor','DonorNote','OrganizationEmailConfig','EmailTemplate','DonorEmailStatus',
+    'DonorBroadcast','BroadcastRecipient','DonorSegment','SegmentAutomation',
+    'OrganizationNotificationConfig','DonorTask','EmailLog','Donation',
+    'RecurringPlan','Payout','KycDocument','Export','OutboundWebhook',
+    'WebhookDelivery','Sponsee','Raffle','RaffleTicket','Event','EventTicketType',
+    'EventTicket','Auction','Lot','Bid','AuditLog'
   ];
 BEGIN
   FOREACH t IN ARRAY org_tables LOOP
@@ -40,8 +46,14 @@ DO $$
 DECLARE
   t text;
   by_org_id text[] := ARRAY[
-    'Membership','CustomDomain','Subscription','Campaign','Page','Donor','Donation',
-    'RecurringPlan','Payout','KycDocument','Export','OutboundWebhook','WebhookDelivery','AuditLog'
+    'OrganizationPaymentConfig','Invitation','Membership','CustomDomain','Subscription',
+    'Campaign','DonationLink','CampaignAmbassador','CampaignReward','CampaignReport',
+    'CampaignUpdate','Page','Donor','DonorNote','OrganizationEmailConfig','EmailTemplate',
+    'DonorEmailStatus','DonorBroadcast','BroadcastRecipient','DonorSegment',
+    'SegmentAutomation','OrganizationNotificationConfig','DonorTask','EmailLog',
+    'Donation','RecurringPlan','Payout','KycDocument','Export','OutboundWebhook',
+    'WebhookDelivery','Sponsee','Raffle','RaffleTicket','Event','EventTicketType',
+    'EventTicket','Auction','Lot','Bid','AuditLog'
   ];
 BEGIN
   FOREACH t IN ARRAY by_org_id LOOP
@@ -88,4 +100,35 @@ CREATE POLICY tenant_isolation ON "DonorTag"
     SELECT 1 FROM "Donor" d
     WHERE d.id = "DonorTag"."donorId"
       AND d."organizationId" = current_setting('app.current_org_id', true)
+  ));
+
+-- Other indirect tables: isolate through their parent tenant row.
+ALTER TABLE "SponseeUpdate" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SponseeUpdate" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "SponseeUpdate";
+CREATE POLICY tenant_isolation ON "SponseeUpdate"
+  USING (EXISTS (
+    SELECT 1 FROM "Sponsee" s
+    WHERE s.id = "SponseeUpdate"."sponseeId"
+      AND s."organizationId" = current_setting('app.current_org_id', true)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM "Sponsee" s
+    WHERE s.id = "SponseeUpdate"."sponseeId"
+      AND s."organizationId" = current_setting('app.current_org_id', true)
+  ));
+
+ALTER TABLE "SegmentMembership" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SegmentMembership" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "SegmentMembership";
+CREATE POLICY tenant_isolation ON "SegmentMembership"
+  USING (EXISTS (
+    SELECT 1 FROM "DonorSegment" s
+    WHERE s.id = "SegmentMembership"."segmentId"
+      AND s."organizationId" = current_setting('app.current_org_id', true)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM "DonorSegment" s
+    WHERE s.id = "SegmentMembership"."segmentId"
+      AND s."organizationId" = current_setting('app.current_org_id', true)
   ));

@@ -1,5 +1,5 @@
 import "server-only";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AppError } from "@donation/shared";
 import { env, isStorageConfigured } from "@/env";
@@ -70,4 +70,16 @@ export function presignUpload(key: string, contentType: string) {
 /** Presigned GET for an authorized reviewer to view a document. */
 export function presignDownload(key: string) {
   return getSignedUrl(s3(), new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key }), { expiresIn: 120 });
+}
+
+/** Verify a direct-to-storage upload exists and return its server-side metadata. */
+export async function headObject(key: string): Promise<{ contentType?: string; contentLength?: number } | null> {
+  try {
+    const result = await s3().send(new HeadObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
+    return { contentType: result.ContentType, contentLength: result.ContentLength };
+  } catch (err) {
+    const status = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+    if (status === 404) return null;
+    throw err;
+  }
 }

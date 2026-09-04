@@ -1,7 +1,6 @@
 import { ForbiddenError } from "@donation/shared";
 import {
   gatewayFromConnection,
-  getGateway,
   isMockGateway,
   MockGateway,
   type ConnectProvider,
@@ -12,8 +11,8 @@ import { prisma } from "./index";
 
 export interface ResolvedOrgGateway {
   gateway: PaymentGateway;
-  /** CONNECTED = org's own account, no split. MANAGED = platform account + split. */
-  mode: "CONNECTED" | "MANAGED";
+  /** BYOG/CONNECTED: the organization owns the gateway account and receives the funds directly. */
+  mode: "CONNECTED";
   provider: ConnectProvider;
   /** Publishable key for browser card tokenization. */
   publicKey: string;
@@ -23,8 +22,9 @@ export interface ResolvedOrgGateway {
 
 /**
  * The gateway an organization transacts through. BYOG: each org connects its own
- * account (panel → Pagamentos). Only orgs flagged MANAGED fall back to the
- * platform's own account + split. Throws (ForbiddenError) if nothing is connected.
+ * account (panel → Pagamentos). The former MANAGED/platform-split mode is no
+ * longer offered and existing rows fail closed until migrated to CONNECTED.
+ * Throws (ForbiddenError) if nothing is connected.
  */
 export async function resolveOrgGateway(organizationId: string): Promise<ResolvedOrgGateway> {
   // Dev / E2E: the fake gateway makes every org payment-ready without a config row.
@@ -47,8 +47,8 @@ export async function resolveOrgGateway(organizationId: string): Promise<Resolve
 
   const provider = cfg.provider as ConnectProvider;
 
-  if (cfg.mode === "MANAGED") {
-    return { gateway: getGateway(), mode: "MANAGED", provider, publicKey: cfg.publicKey, webhookSecret: cfg.webhookSecret };
+  if (cfg.mode !== "CONNECTED") {
+    throw new ForbiddenError("O modo de recebimento gerenciado foi descontinuado. Conecte a conta própria da organização.");
   }
 
   const secretKey = decryptSecret(cfg.secretKeyEnc);

@@ -45,7 +45,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ orgId: 
       data: [{ id: event.id, type: event.type, payload: event.data as object }],
       skipDuplicates: true,
     });
-    if (created.count === 0) return NextResponse.json({ ok: true, duplicate: true });
+    // A previous delivery may have committed the inbox row but failed before
+    // publishing to Redis. Re-enqueue duplicates; BullMQ's jobId keeps this
+    // idempotent while recovering the lost hand-off.
+    if (created.count === 0) {
+      await enqueueGatewayEvent({ gatewayEventId: event.id });
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
 
     await enqueueGatewayEvent({ gatewayEventId: event.id });
     return NextResponse.json({ ok: true });

@@ -5,10 +5,10 @@ import { prisma } from "@donation/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Verify a Svix-signed webhook (Resend uses Svix). Returns true when valid or unconfigured. */
+/** Verify a Svix-signed webhook (Resend uses Svix). */
 function verify(raw: string, headers: Headers): boolean {
   const secret = process.env.RESEND_WEBHOOK_SECRET;
-  if (!secret) return true; // dev / not configured — accept but the caller logs a warning
+  if (!secret) return process.env.NODE_ENV !== "production";
 
   const id = headers.get("svix-id");
   const ts = headers.get("svix-timestamp");
@@ -30,12 +30,14 @@ function verify(raw: string, headers: Headers): boolean {
 export async function POST(req: Request) {
   const raw = await req.text();
 
+  if (!process.env.RESEND_WEBHOOK_SECRET && process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "webhook_not_configured" }, { status: 503 });
+  }
+
   if (!verify(raw, req.headers)) {
     return NextResponse.json({ error: "invalid signature" }, { status: 401 });
   }
-  if (!process.env.RESEND_WEBHOOK_SECRET) {
-    console.warn("resend webhook: RESEND_WEBHOOK_SECRET not set — accepting unverified");
-  }
+  if (!process.env.RESEND_WEBHOOK_SECRET) console.warn("resend webhook: RESEND_WEBHOOK_SECRET not set (development only)");
 
   let event: { type?: string; data?: { to?: string[] | string; email?: string } };
   try {

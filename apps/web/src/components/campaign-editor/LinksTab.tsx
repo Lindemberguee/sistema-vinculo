@@ -177,7 +177,7 @@ function LinkRow({
         <p className="mt-2.5 text-xs text-muted">
           {link.amountReais && <>Valor {link.lockAmount ? "fixo" : "sugerido"} R$ {link.amountReais}. </>}
           {link.defaultRecurring && <>Já vem mensal. </>}
-          {link.defaultCoverFee && <>Cobre a taxa por padrão. </>}
+          {link.defaultCoverFee && <>Contribuição extra marcada por padrão. </>}
           {link.expiresAt && <>Expira em {new Date(link.expiresAt).toLocaleString("pt-BR")}. </>}
         </p>
       )}
@@ -332,7 +332,7 @@ function LinkFields({
           name="defaultCoverFee"
           value="true"
           defaultChecked={initial?.defaultCoverFee}
-          label="Já vir marcado “cobrir a taxa da plataforma”"
+          label="Já vir marcada “contribuição extra”"
         />
       </div>
 

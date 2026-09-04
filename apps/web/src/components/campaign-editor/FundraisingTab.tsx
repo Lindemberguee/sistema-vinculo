@@ -69,7 +69,7 @@ export function FundraisingTab({
           </Field>
         </div>
         <Checkbox name="allowRecurring" value="true" defaultChecked={initial.allowRecurring} label="Permitir doação mensal" />
-        <Checkbox name="allowTip" value="true" defaultChecked={initial.allowTip} label="Oferecer ao doador cobrir a taxa da plataforma" />
+        <Checkbox name="allowTip" value="true" defaultChecked={initial.allowTip} label="Permitir contribuição extra à causa" />
       </SectionCard>
 
       <SectionCard title="Doações fora da plataforma" desc="Valores recebidos por fora que devem contar no total da campanha.">

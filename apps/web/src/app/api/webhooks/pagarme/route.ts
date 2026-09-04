@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@donation/db";
-import { getGateway } from "@donation/payments";
 import { ForbiddenError, isAppError } from "@donation/shared";
 import { enqueueGatewayEvent } from "@/server/queue";
 import { getOrgGateway } from "@/server/payments/resolve";
@@ -12,9 +11,8 @@ export const dynamic = "force-dynamic";
 /**
  * Legacy platform-wide Pagar.me webhook receiver.
  *
- * - MANAGED plan (platform's own Pagar.me account): verify with the platform
- *   secret, same as always.
- * - BYOG deploy (no platform account configured): the modern URL is
+ * - The former MANAGED/platform account path is permanently disabled.
+ * - BYOG deploy: the modern URL is
  *   `/api/webhooks/pagarme/{orgId}`, but providers already pointed at this path
  *   still work — we resolve the organization from the event payload and verify
  *   with that org's own secret.
@@ -24,49 +22,48 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: Request) {
   const raw = await req.text();
-  const platformConfigured = Boolean(process.env.PAGARME_SECRET_KEY && process.env.PAGARME_WEBHOOK_SECRET);
+  // Any legacy global credential is enough to indicate an old deployment;
+  // fail closed instead of silently accepting an incompletely configured path.
+  const platformConfigured = Boolean(process.env.PAGARME_SECRET_KEY || process.env.PAGARME_WEBHOOK_SECRET);
+  if (platformConfigured) {
+    return NextResponse.json(
+      { error: "managed_disabled", message: "O webhook global foi descontinuado. Configure a URL por organização." },
+      { status: 410 },
+    );
+  }
+
+  // BYOG: figure out which org this event belongs to, then verify with its secret.
+  let payload: { data?: Record<string, unknown> } | null;
+  try {
+    payload = JSON.parse(raw) as { data?: Record<string, unknown> };
+  } catch {
+    return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  }
+
+  const orgId = await orgIdFromPayload(payload?.data ?? {});
+  if (!orgId) {
+    console.warn("pagarme webhook: could not map event to an org — use /api/webhooks/pagarme/{orgId}");
+    return NextResponse.json(
+      { error: "not_configured", message: "Use a URL por organização: /api/webhooks/pagarme/{orgId}" },
+      { status: 404 },
+    );
+  }
+
+  let gateway;
+  try {
+    gateway = (await getOrgGateway(orgId)).gateway;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return NextResponse.json({ error: "not_connected" }, { status: 404 });
+    console.error(`pagarme webhook: resolve failed for org ${orgId}`, err);
+    return NextResponse.json({ error: "internal" }, { status: 500 });
+  }
 
   let event;
-  if (platformConfigured) {
-    try {
-      event = getGateway().verifyWebhook(raw, req.headers);
-    } catch (err) {
-      console.warn("pagarme webhook: bad signature", err);
-      return NextResponse.json({ error: "invalid signature" }, { status: 401 });
-    }
-  } else {
-    // BYOG: figure out which org this event belongs to, then verify with its secret.
-    let payload: { data?: Record<string, unknown> } | null;
-    try {
-      payload = JSON.parse(raw) as { data?: Record<string, unknown> };
-    } catch {
-      return NextResponse.json({ error: "invalid body" }, { status: 400 });
-    }
-
-    const orgId = await orgIdFromPayload(payload?.data ?? {});
-    if (!orgId) {
-      console.warn("pagarme webhook: no platform account and could not map event to an org — use /api/webhooks/pagarme/{orgId}");
-      return NextResponse.json(
-        { error: "not_configured", message: "Use a URL por organização: /api/webhooks/pagarme/{orgId}" },
-        { status: 404 },
-      );
-    }
-
-    let gateway;
-    try {
-      gateway = (await getOrgGateway(orgId)).gateway;
-    } catch (err) {
-      if (err instanceof ForbiddenError) return NextResponse.json({ error: "not_connected" }, { status: 404 });
-      console.error(`pagarme webhook: resolve failed for org ${orgId}`, err);
-      return NextResponse.json({ error: "internal" }, { status: 500 });
-    }
-
-    try {
-      event = gateway.verifyWebhook(raw, req.headers);
-    } catch (err) {
-      console.warn(`pagarme webhook: bad signature (org ${orgId})`, err);
-      return NextResponse.json({ error: "invalid signature" }, { status: 401 });
-    }
+  try {
+    event = gateway.verifyWebhook(raw, req.headers);
+  } catch (err) {
+    console.warn(`pagarme webhook: bad signature (org ${orgId})`, err);
+    return NextResponse.json({ error: "invalid signature" }, { status: 401 });
   }
 
   // Connectivity check fired by the panel's "Testar webhook" button.
@@ -80,8 +77,11 @@ export async function POST(req: Request) {
       skipDuplicates: true,
     });
 
-    // Already seen → acknowledge and stop (idempotent).
+    // A previous delivery may have committed the inbox row but failed before
+    // publishing to Redis. Re-enqueue duplicates; BullMQ's jobId keeps this
+    // idempotent while recovering the lost hand-off.
     if (created.count === 0) {
+      await enqueueGatewayEvent({ gatewayEventId: event.id });
       return NextResponse.json({ ok: true, duplicate: true });
     }
 

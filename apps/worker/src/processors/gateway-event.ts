@@ -1,4 +1,4 @@
-import { notifyOrgTeam, prisma } from "@donation/db";
+import { prisma } from "@donation/db";
 import {
   handleSubscriptionFailure,
   markChargePaid,
@@ -48,9 +48,6 @@ export async function processGatewayEvent(gatewayEventId: string): Promise<void>
         if (chargeId) await reverseCharge(chargeId, "CHARGED_BACK");
         break;
       }
-      case "recipient.updated":
-        await syncRecipientKyc(data);
-        break;
       case "subscription.charged":
       case "invoice.paid": {
         const subId = subscriptionIdOf(data);
@@ -90,39 +87,4 @@ function gatewayFeeOf(data: Record<string, any>): number {
 
 function subscriptionIdOf(data: Record<string, any>): string | undefined {
   return data.subscription_id ?? data.subscription?.id ?? data.invoice?.subscription_id ?? data.charge?.subscription_id;
-}
-
-async function syncRecipientKyc(data: Record<string, any>) {
-  const recipientId: string | undefined = data.id ?? data.recipient?.id;
-  const code: string | undefined = data.code ?? data.recipient?.code; // we set code = organizationId
-  if (!recipientId && !code) return;
-
-  const raw = String(data.status ?? data.kyc_details?.status ?? "").toLowerCase();
-  const kycStatus =
-    raw.includes("approv") || raw === "active"
-      ? "APPROVED"
-      : raw.includes("refus") || raw.includes("reject")
-        ? "REJECTED"
-        : "IN_REVIEW";
-
-  const where = code ? { id: code } : { gatewayRecipientId: recipientId };
-  const before = await prisma.organization.findFirst({ where, select: { id: true, kycStatus: true } });
-
-  await prisma.organization.updateMany({
-    where,
-    data: {
-      kycStatus,
-      status: kycStatus === "APPROVED" ? "ACTIVE" : undefined,
-      gatewayRecipientId: recipientId ?? undefined,
-    },
-  });
-
-  // Alert the org team when the gateway flips their KYC to a terminal state.
-  if (before && before.kycStatus !== kycStatus && (kycStatus === "APPROVED" || kycStatus === "REJECTED")) {
-    try {
-      await notifyOrgTeam(before.id, kycStatus === "APPROVED" ? "kyc.approved" : "kyc.rejected");
-    } catch (e) {
-      console.error("notifyOrgTeam (recipient.updated):", e instanceof Error ? e.message : e);
-    }
-  }
 }

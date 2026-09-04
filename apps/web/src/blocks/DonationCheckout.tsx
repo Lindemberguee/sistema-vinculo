@@ -417,7 +417,7 @@ export function DonationCheckout(props: DonationCheckoutProps) {
             </label>
           )
         )}
-        {props.allowTip && (
+        {props.allowTip && props.platformFeeBps > 0 && (
           <label className={checkboxRow}>
             <input
               type="checkbox"

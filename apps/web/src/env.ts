@@ -31,12 +31,11 @@ const schema = z.object({
   /** Set to "mock" for local dev / E2E — uses an in-process fake gateway. */
   PAYMENTS_GATEWAY: optional(z.enum(["mock"])),
 
-  // Platform Pagar.me account — only needed for the MANAGED (facilitator + split)
-  // plan. A pure BYOG deployment (orgs connect their own gateway) can omit these.
+  // Legacy platform keys are retained only for migration tooling. Donations
+  // must use the organization's own connected gateway (BYOG).
   PAGARME_SECRET_KEY: optional(z.string().min(8)),
   PAGARME_PUBLIC_KEY: optional(z.string().min(8)),
   PAGARME_WEBHOOK_SECRET: optional(z.string().min(8)),
-  PLATFORM_RECIPIENT_ID: optional(z.string().min(3)),
 
   // International donations (Stripe). Optional — the intl checkout stays hidden
   // until these are set.

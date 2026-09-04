@@ -71,7 +71,7 @@ export const DonationCheckoutBlock = z.object({
     methods: z.array(z.enum(["PIX", "CREDIT_CARD", "BOLETO"])).min(1).default(["PIX", "CREDIT_CARD", "BOLETO"]),
     allowRecurring: z.boolean().default(true),
     allowTip: z.boolean().default(true),
-    tipLabel: z.string().max(120).default("Quero cobrir a taxa da plataforma"),
+    tipLabel: z.string().max(120).default("Adicionar uma contribuição extra à causa"),
   }),
 });
 

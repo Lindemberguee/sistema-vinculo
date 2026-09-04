@@ -33,7 +33,7 @@ async function load(hostParam: string, campaignSlug: string, sponseeId: string) 
 
   const plan = await prisma.plan.findUnique({
     where: { id: campaign.organization.planId },
-    select: { platformFeeBps: true },
+    select: { id: true },
   });
   const branding = (campaign.organization.branding ?? {}) as { primaryColor?: string; logoUrl?: string };
   const pay = await resolveOrgPublicKey(tenant.organizationId);
@@ -47,7 +47,7 @@ async function load(hostParam: string, campaignSlug: string, sponseeId: string) 
       accent: branding.primaryColor ?? null,
     },
     accent: branding.primaryColor ?? DEFAULT_ACCENT,
-    platformFeeBps: plan?.platformFeeBps ?? 490,
+    platformFeeBps: 0,
     pagarmePublicKey: pay.publicKey,
   };
 }
@@ -106,7 +106,7 @@ export default async function SponsorPage({
             methods={["PIX", "CREDIT_CARD"]}
             allowRecurring
             allowTip={campaign.allowTip}
-            tipLabel="Quero cobrir a taxa da plataforma"
+            tipLabel="Adicionar uma contribuição extra à causa"
             platformFeeBps={data.platformFeeBps}
             pagarmePublicKey={data.pagarmePublicKey}
             accentColor={accent}

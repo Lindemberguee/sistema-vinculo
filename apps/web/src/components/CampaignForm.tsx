@@ -93,7 +93,7 @@ export function CampaignForm({
         name="allowTip"
         value="true"
         defaultChecked={values.allowTip}
-        label="Oferecer ao doador cobrir a taxa da plataforma"
+        label="Permitir uma contribuição extra à causa"
       />
 
       <fieldset className="grid gap-3 rounded-lg border border-line p-4">
