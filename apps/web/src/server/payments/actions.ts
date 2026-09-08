@@ -22,10 +22,9 @@ export interface PaymentConnectResult {
 }
 
 const APP_BASE = env.APP_BASE_DOMAIN;
-const SCHEME = APP_BASE.includes("localhost") ? "http" : "https";
 const WEBHOOK_ORIGIN =
   env.PUBLIC_WEBHOOK_BASE_URL?.replace(/\/$/, "") ??
-  `${SCHEME}://${APP_BASE.startsWith("app.") ? APP_BASE : `app.${APP_BASE}`}`;
+  publicOriginFor(APP_BASE.startsWith("app.") ? APP_BASE : `app.${APP_BASE}`, null);
 const webhookUrlFor = (provider: ConnectProvider, orgId: string) =>
   `${WEBHOOK_ORIGIN}/api/webhooks/${provider.toLowerCase()}/${orgId}`;
 
@@ -180,8 +179,7 @@ export async function testWebhookEndpoint(orgId: string, urlOverride?: string): 
     } else {
       const h = await headers();
       const reqHost = h.get("host") ?? (APP_BASE.startsWith("app.") ? APP_BASE : `app.${APP_BASE}`);
-      const reqScheme = h.get("x-forwarded-proto") ?? (reqHost.includes("localhost") ? "http" : "https");
-      defaultUrl = `${reqScheme}://${reqHost}${path}`;
+      defaultUrl = `${publicOriginFor(reqHost, h.get("x-forwarded-proto"))}${path}`;
     }
 
     let target: URL;
@@ -286,6 +284,13 @@ export async function testWebhookEndpoint(orgId: string, urlOverride?: string): 
     if (err instanceof Error) return { ok: false, error: err.message };
     throw err;
   }
+}
+
+function publicOriginFor(host: string, forwardedProto: string | null): string {
+  const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+  const isLocal = hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost");
+  const scheme = isLocal ? (forwardedProto ?? "http") : "https";
+  return `${scheme}://${host}`;
 }
 
 function isPrivateAddress(address: string): boolean {

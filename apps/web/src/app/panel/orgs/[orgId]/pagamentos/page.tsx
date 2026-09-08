@@ -29,8 +29,8 @@ export default async function PaymentsPage({ params }: { params: Promise<{ orgId
   const reqHost = h.get("host") ?? "";
   const envBase = env.APP_BASE_DOMAIN;
   const host = reqHost || (envBase.startsWith("app.") ? envBase : `app.${envBase}`);
-  const scheme = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
-  const origin = env.PUBLIC_WEBHOOK_BASE_URL?.replace(/\/$/, "") ?? `${scheme}://${host}`;
+  const forwardedProto = h.get("x-forwarded-proto");
+  const origin = env.PUBLIC_WEBHOOK_BASE_URL?.replace(/\/$/, "") ?? publicOriginFor(host, forwardedProto);
   const webhookUrl = cfg ? `${origin}/api/webhooks/${cfg.provider.toLowerCase()}/${orgId}` : "";
   const [webhookUser, webhookPassword] = (cfg?.webhookSecret ?? "hook:").split(/:(.*)/s);
   const localHost = /^https?:\/\/(localhost|127\.0\.0\.1|[^/]*\.localhost)/.test(origin);
@@ -96,4 +96,11 @@ export default async function PaymentsPage({ params }: { params: Promise<{ orgId
       )}
     </>
   );
+}
+
+function publicOriginFor(host: string, forwardedProto: string | null): string {
+  const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+  const isLocal = hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost");
+  const scheme = isLocal ? (forwardedProto ?? "http") : "https";
+  return `${scheme}://${host}`;
 }
