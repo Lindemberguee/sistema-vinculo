@@ -10,6 +10,7 @@ Atualizada em 4 de setembro de 2026 a partir do código existente no workspace.
 4. [Identidade visual](./identidade-visual.md) — referência de marca, tokens, componentes e acessibilidade já existente no projeto.
 5. [Plano de monetização](./PLANO-MONETIZACAO.md) — mensalidade fixa, faixas de uso, progressão e requisitos de cobrança.
 6. [Plano de refinamento UI/UX](./UI-UX-REFINAMENTO.md) — direção visual, fundação compartilhada, fases e critérios de aceite.
+7. [Marca Vínculo](./MARCA-VINCULO.md) — nome comercial, posicionamento, voz e aplicações visuais.
 
 ## Estado resumido
 

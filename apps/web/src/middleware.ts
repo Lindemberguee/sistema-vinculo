@@ -3,10 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * Host-based tenant routing.
  *
- *   app.<base>     → /panel/*   (dashboard; auth guards inside)
- *   admin.<base>   → /admin/*   (platform back-office)
- *   <slug>.<base>  → /sites/<host>/*   (public campaign pages)
- *   custom domain  → /sites/<host>/*
+ *   <base>/www.<base> → marketing
+ *   app.<base>        → /panel/*   (dashboard; auth guards inside)
+ *   admin.<base>      → /admin/*   (platform back-office)
+ *   <slug>.<base>     → /sites/<host>/*   (public campaign pages)
+ *   custom domain     → /sites/<host>/*
  *
  * DB lookups are NOT done here (Edge). The rewrite carries the raw host in a
  * header; RSC loaders under /sites resolve it via resolveTenant().
@@ -32,7 +33,10 @@ export function middleware(req: NextRequest) {
   const host = rawHost.split(":")[0]!;
   const base = BASE_DOMAIN.split(":")[0]!;
   const url = req.nextUrl.clone();
-  const isMarketingHost = host === base || (VERCEL_DEPLOYMENT_HOST !== "" && host === VERCEL_DEPLOYMENT_HOST);
+  const isMarketingHost =
+    host === base ||
+    host === `www.${base}` ||
+    (VERCEL_DEPLOYMENT_HOST !== "" && host === VERCEL_DEPLOYMENT_HOST);
 
   // The bare/base domain is the public marketing surface at `/`. Keep the
   // panel on the app subdomain, while preserving the existing local-dev

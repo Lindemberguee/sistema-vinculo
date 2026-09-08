@@ -19,9 +19,9 @@ botão + logo), com um guarda-corpo de contraste real em vez do teste de luminâ
 (3) fechar lacunas de acessibilidade pontuais (rótulos só-placeholder no login, texto de
 pílula com contraste ~3,9:1, ausência de `prefers-reduced-motion`); (4) dar nomes semânticos
 à escala tipográfica e aos tokens de movimento/elevação/z-index que hoje são valores soltos.
-A marca (nome e logo) ainda não existe — este documento entrega um **framework** de naming,
-direção de logotipo e voz, e recomenda **não** decidir o nome agora, mas já preparar o
-sistema para receber qualquer marca sem retrabalho. Modo escuro: não agora; os tokens ficam
+O nome comercial e o direcionamento da marca estão definidos em
+[`MARCA-VINCULO.md`](./MARCA-VINCULO.md). Este documento mantém o sistema pronto para
+aplicar a marca sem retrabalho. Modo escuro: não agora; os tokens ficam
 "prontos para escuro" para que seja uma adição, não uma reescrita. O roadmap é em 6 fases
 independentes, cada uma entregável sem big-bang, começando pela fundação de tokens.
 

@@ -2,13 +2,15 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button, Card, CardBody, Field, Input } from "@/components/ui";
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
+  // "/" is the panel home on the app.<domain> subdomain (the middleware rewrites
+  // it to /panel). Do NOT use "/panel" here — the middleware would rewrite that
+  // to /panel/panel and 404.
   const callbackUrl = params.get("callbackUrl") ?? "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,13 +22,15 @@ function LoginForm() {
     setBusy(true);
     setError(null);
     const res = await signIn("credentials", { email, password, redirect: false });
-    setBusy(false);
     if (res?.error) {
+      setBusy(false);
       setError("E-mail ou senha inválidos.");
       return;
     }
-    router.push(callbackUrl);
-    router.refresh();
+    // Full-page navigation, not router.push: guarantees the fresh session
+    // cookie is attached to the next request so the panel doesn't bounce
+    // straight back to /login.
+    window.location.assign(callbackUrl);
   }
 
   return (
