@@ -2,7 +2,9 @@ import Link from "next/link";
 import { formatBRL } from "@donation/shared";
 import { requireOrgAccessPage } from "@/server/auth-helpers";
 import { getCampaignsSummary } from "@/server/panel/summaries";
+import { orgPublicOrigin } from "@/server/links/url";
 import { RowMenu } from "@/components/RowMenu";
+import { CopyButton } from "@/components/public/CopyButton";
 import {
   PageHeader,
   LinkButton,
@@ -22,7 +24,14 @@ export default async function CampaignsList({ params }: { params: Promise<{ orgI
   const { db } = await requireOrgAccessPage(orgId, "VIEWER");
 
   const [org, summary, campaigns] = await Promise.all([
-    db.organization.findFirst({ where: { id: orgId }, select: { status: true } }),
+    db.organization.findFirst({
+      where: { id: orgId },
+      select: {
+        status: true,
+        slug: true,
+        customDomains: { where: { verifiedAt: { not: null } }, take: 1, select: { host: true } },
+      },
+    }),
     getCampaignsSummary(orgId),
     db.campaign.findMany({
       orderBy: { updatedAt: "desc" },
@@ -37,6 +46,7 @@ export default async function CampaignsList({ params }: { params: Promise<{ orgI
       },
     }),
   ]);
+  const publicOrigin = org ? orgPublicOrigin({ slug: org.slug, customHost: org.customDomains[0]?.host ?? null }) : null;
 
   return (
     <>
@@ -94,6 +104,22 @@ export default async function CampaignsList({ params }: { params: Promise<{ orgI
                         {c.title}
                       </Link>
                       <div className="text-xs text-muted">/{c.slug}</div>
+                      {publicOrigin && c.status === "PUBLISHED" && (
+                        <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                          <a
+                            href={`${publicOrigin}/${c.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="min-w-0 truncate text-xs text-brand-700 hover:underline"
+                          >
+                            Abrir página pública ↗
+                          </a>
+                          <CopyButton text={`${publicOrigin}/${c.slug}`} label="Copiar link" />
+                        </div>
+                      )}
+                      {publicOrigin && c.status !== "PUBLISHED" && (
+                        <div className="mt-1 text-xs text-faint">Link público disponível após publicar</div>
+                      )}
                     </Td>
                     <Td className="tabular-nums">
                       {formatBRL(c.raisedCents)}

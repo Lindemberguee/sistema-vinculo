@@ -49,7 +49,10 @@ export const GalleryBlock = z.object({
   id: blockId,
   type: z.literal("gallery"),
   props: z.object({
-    images: z.array(z.object({ url: z.string().url(), alt: z.string().max(200).default("") })).min(1).max(24),
+    images: z
+      .array(z.object({ url: z.string().url(), alt: z.string().max(200).default("") }))
+      .min(1)
+      .max(24),
     columns: z.number().int().min(1).max(4).default(3),
   }),
 });
@@ -60,7 +63,7 @@ export const AmountOptionsBlock = z.object({
   props: z.object({
     amountsCents: z.array(cents.positive()).min(1).max(8),
     allowCustom: z.boolean().default(true),
-    defaultIndex: z.number().int().nonnegative().default(1),
+    defaultIndex: z.number().int().nonnegative().default(0),
   }),
 });
 
@@ -68,7 +71,10 @@ export const DonationCheckoutBlock = z.object({
   id: blockId,
   type: z.literal("donationCheckout"),
   props: z.object({
-    methods: z.array(z.enum(["PIX", "CREDIT_CARD", "BOLETO"])).min(1).default(["PIX", "CREDIT_CARD", "BOLETO"]),
+    methods: z
+      .array(z.enum(["PIX", "CREDIT_CARD", "BOLETO"]))
+      .min(1)
+      .default(["PIX", "CREDIT_CARD", "BOLETO"]),
     allowRecurring: z.boolean().default(true),
     allowTip: z.boolean().default(true),
     tipLabel: z.string().max(120).default("Adicionar uma contribuição extra à causa"),
@@ -102,7 +108,14 @@ export const TestimonialsBlock = z.object({
   type: z.literal("testimonials"),
   props: z.object({
     items: z
-      .array(z.object({ quote: z.string().max(600), author: z.string().max(80), role: z.string().max(80).optional(), avatarUrl: z.string().url().optional() }))
+      .array(
+        z.object({
+          quote: z.string().max(600),
+          author: z.string().max(80),
+          role: z.string().max(80).optional(),
+          avatarUrl: z.string().url().optional(),
+        }),
+      )
       .min(1)
       .max(12),
   }),
@@ -112,7 +125,10 @@ export const FaqBlock = z.object({
   id: blockId,
   type: z.literal("faq"),
   props: z.object({
-    items: z.array(z.object({ q: z.string().max(200), a: z.string().max(2000) })).min(1).max(30),
+    items: z
+      .array(z.object({ q: z.string().max(200), a: z.string().max(2000) }))
+      .min(1)
+      .max(30),
   }),
 });
 
@@ -174,7 +190,7 @@ export const RaffleWidgetBlock = z.object({
   props: z.object({
     /** Which raffle this block sells. */
     raffleId: z.string().min(1),
-    quickAmounts: z.array(z.number().int().positive()).max(6).default([1, 5, 10, 20]),
+    quickAmounts: z.array(z.number().int().positive()).min(1).max(6).default([1, 5, 10, 20]),
     allowPickNumbers: z.boolean().default(true),
   }),
 });
@@ -206,7 +222,7 @@ export const IntlDonationBlock = z.object({
     title: z.string().max(120).default("Donate from abroad"),
     currencies: z.array(z.string().length(3)).min(1).max(6).default(["USD", "EUR"]),
     /** Suggested amounts in MAJOR units (applied to whichever currency). */
-    suggestedAmounts: z.array(z.number().int().positive()).max(6).default([10, 25, 50, 100]),
+    suggestedAmounts: z.array(z.number().int().positive()).min(1).max(6).default([10, 25, 50, 100]),
   }),
 });
 
@@ -368,11 +384,35 @@ export const PageBlocks = z
   .max(60)
   .superRefine((blocks, ctx) => {
     const ids = new Set<string>();
-    for (const b of blocks) {
+    for (const [index, b] of blocks.entries()) {
       if (ids.has(b.id)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: `duplicate block id: ${b.id}` });
       }
       ids.add(b.id);
+      if (b.type === "amountOptions" && b.props.defaultIndex >= b.props.amountsCents.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "props", "defaultIndex"],
+          message: "Escolha um valor existente na lista",
+        });
+      }
+      if (b.type === "hero" && b.props.ctaTarget === "url" && !b.props.ctaUrl) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "props", "ctaUrl"],
+          message: "Informe a URL do botão",
+        });
+      }
+      if (b.type === "cta" && b.props.target === "url" && !b.props.url) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [index, "props", "url"], message: "Informe a URL do botão" });
+      }
+      if (b.type === "imageText" && b.props.ctaTarget === "url" && b.props.ctaLabel && !b.props.ctaUrl) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "props", "ctaUrl"],
+          message: "Informe a URL do botão",
+        });
+      }
     }
   });
 

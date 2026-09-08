@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type Dispatch } from "react";
 import { Trash2, TriangleAlert } from "lucide-react";
-import { BLOCK_REGISTRY } from "@donation/blocks";
+import { BLOCK_REGISTRY, Block as BlockSchema } from "@donation/blocks";
 import { EDITOR_FIELDS } from "@/blocks/editor-fields";
 import { cn } from "@/components/ui";
 import { FieldInput } from "./FieldInput";
@@ -16,9 +16,10 @@ import type { Theme } from "./Studio";
 
 type Tab = "block" | "page" | "theme";
 
-const HINT_BY_TYPE = Object.fromEntries(
-  PALETTE.flatMap((g) => g.items.map((it) => [it.type, it.hint])),
-) as Record<string, string>;
+const HINT_BY_TYPE = Object.fromEntries(PALETTE.flatMap((g) => g.items.map((it) => [it.type, it.hint]))) as Record<
+  string,
+  string
+>;
 
 export function Inspector({
   orgId,
@@ -59,8 +60,20 @@ export function Inspector({
             key={t}
             type="button"
             role="tab"
+            id={`inspector-tab-${t}`}
             aria-selected={tab === t}
+            aria-controls={`inspector-panel-${t}`}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+              event.preventDefault();
+              const current = ["block", "page", "theme"] as Tab[];
+              const index = current.indexOf(t);
+              const next = current[(index + (event.key === "ArrowRight" ? 1 : -1) + current.length) % current.length]!;
+              setTab(next);
+              document.getElementById(`inspector-tab-${next}`)?.focus();
+            }}
             className={cn(
               "flex-1 rounded-md px-2 py-1.5 text-[0.8125rem] font-medium transition-colors",
               tab === t ? "bg-canvas text-ink" : "text-muted hover:text-ink",
@@ -71,7 +84,13 @@ export function Inspector({
         ))}
       </div>
 
-      <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div
+        id={`inspector-panel-${tab}`}
+        role="tabpanel"
+        aria-labelledby={`inspector-tab-${tab}`}
+        tabIndex={0}
+        className="min-h-0 flex-1 overflow-y-auto p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+      >
         {tab === "block" &&
           (selected ? (
             <BlockPanel key={selected.id} block={selected} dispatch={dispatch} />
@@ -93,13 +112,32 @@ function BlockPanel({ block, dispatch }: { block: EditorBlock; dispatch: Dispatc
   const fields = EDITOR_FIELDS[block.type];
   const issues = blockIssues(block);
 
-  // Live per-field validation against the block's Zod schema.
+  // Live per-field validation against the block's Zod schema, including
+  // range/format errors (not only required fields).
   const errors: Record<string, string> = {};
-  for (const f of fields) {
-    if (f.required) {
-      const v = (block.props as Record<string, unknown>)[f.key];
-      if (v == null || v === "" || (Array.isArray(v) && v.length === 0)) errors[f.key] = "Obrigatório";
+  const parsed = BlockSchema.safeParse(block);
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) {
+      const key = issue.path[1];
+      if (typeof key === "string" && !errors[key]) errors[key] = issue.message;
     }
+  }
+  if (
+    block.type === "amountOptions" &&
+    typeof block.props.defaultIndex === "number" &&
+    Array.isArray(block.props.amountsCents) &&
+    block.props.defaultIndex >= block.props.amountsCents.length
+  ) {
+    errors.defaultIndex = "Escolha um valor existente na lista";
+  }
+  if (block.type === "hero" && block.props.ctaTarget === "url" && !block.props.ctaUrl) {
+    errors.ctaUrl = "Informe a URL do botão";
+  }
+  if (block.type === "cta" && block.props.target === "url" && !block.props.url) {
+    errors.url = "Informe a URL do botão";
+  }
+  if (block.type === "imageText" && block.props.ctaTarget === "url" && block.props.ctaLabel && !block.props.ctaUrl) {
+    errors.ctaUrl = "Informe a URL do botão";
   }
 
   return (
@@ -118,8 +156,7 @@ function BlockPanel({ block, dispatch }: { block: EditorBlock; dispatch: Dispatc
         <div className="flex items-start gap-2 rounded-lg bg-warn-bg px-3 py-2.5 text-xs text-warn">
           <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            Falta preencher: <strong>{issues.join(", ")}</strong>. O bloco não aparece na página até isso ser
-            resolvido.
+            Revise: <strong>{issues.join(", ")}</strong>. O bloco não aparece na página até isso ser resolvido.
           </span>
         </div>
       )}

@@ -26,6 +26,17 @@ function Notice({ children }: { children: ReactNode }) {
   );
 }
 
+function PreviewNotice({ label }: { label: string }) {
+  return (
+    <div className="mx-auto max-w-md px-4 py-8">
+      <div className="rounded-xl border border-dashed border-line-strong bg-canvas px-5 py-4 text-center text-sm text-muted">
+        <p className="font-medium text-ink">{label}</p>
+        <p className="mt-1">Este recurso fica disponível somente na página publicada.</p>
+      </div>
+    </div>
+  );
+}
+
 /** Renders a validated Block[] for the public campaign page. */
 export function BlockList({ blocks, ctx }: { blocks: Block[]; ctx: RenderContext }) {
   return (
@@ -88,6 +99,7 @@ function BlockView({ block, ctx }: { block: Block; ctx: RenderContext }): ReactN
       );
 
     case "sponseeGrid":
+      if (ctx.host === "preview") return <PreviewNotice label="Apadrinhamento" />;
       return (
         <SponseeGrid
           ctx={ctx}
@@ -100,15 +112,34 @@ function BlockView({ block, ctx }: { block: Block; ctx: RenderContext }): ReactN
       );
 
     case "raffleWidget":
-      return <RaffleBlock ctx={ctx} raffleId={block.props.raffleId} quickAmounts={block.props.quickAmounts} allowPickNumbers={block.props.allowPickNumbers} accent={accent} />;
+      if (ctx.host === "preview") return <PreviewNotice label="Rifa" />;
+      return (
+        <RaffleBlock
+          ctx={ctx}
+          raffleId={block.props.raffleId}
+          quickAmounts={block.props.quickAmounts}
+          allowPickNumbers={block.props.allowPickNumbers}
+          accent={accent}
+        />
+      );
 
     case "eventTickets":
-      return <EventBlock ctx={ctx} eventId={block.props.eventId} askAttendeeNames={block.props.askAttendeeNames} accent={accent} />;
+      if (ctx.host === "preview") return <PreviewNotice label="Ingressos do evento" />;
+      return (
+        <EventBlock
+          ctx={ctx}
+          eventId={block.props.eventId}
+          askAttendeeNames={block.props.askAttendeeNames}
+          accent={accent}
+        />
+      );
 
     case "auctionLots":
+      if (ctx.host === "preview") return <PreviewNotice label="Leilão" />;
       return <AuctionBlock ctx={ctx} auctionId={block.props.auctionId} columns={block.props.columns} accent={accent} />;
 
     case "intlDonation":
+      if (ctx.host === "preview") return <PreviewNotice label="Doação internacional" />;
       if (!isIntlEnabled) return null;
       return (
         <div className="flex justify-center px-4 py-8">
@@ -200,7 +231,8 @@ async function AmbassadorLeaderboard({
       ) : (
         <ol className="space-y-2">
           {rows.map((a, i) => {
-            const pct = a.goalCents && a.goalCents > 0 ? Math.min(100, Math.round((a.raisedCents / a.goalCents) * 100)) : null;
+            const pct =
+              a.goalCents && a.goalCents > 0 ? Math.min(100, Math.round((a.raisedCents / a.goalCents) * 100)) : null;
             return (
               <li key={a.slug}>
                 <a
@@ -241,7 +273,15 @@ async function CampaignRewards({ ctx, title, accent }: { ctx: RenderContext; tit
   const rows = await prisma.campaignReward.findMany({
     where: { organizationId: ctx.organizationId, campaign: { slug: ctx.campaign.slug } },
     orderBy: { sortOrder: "asc" },
-    select: { id: true, title: true, description: true, imageUrl: true, amountCents: true, quantity: true, claimed: true },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      imageUrl: true,
+      amountCents: true,
+      quantity: true,
+      claimed: true,
+    },
   });
   if (rows.length === 0) return null;
 
@@ -425,7 +465,15 @@ async function SponseeGrid({
     where: { organizationId: ctx.organizationId, status: "AVAILABLE", ...(category ? { category } : {}) },
     orderBy: { createdAt: "asc" },
     take: 60,
-    select: { id: true, name: true, category: true, story: true, photoUrl: true, birthYear: true, monthlyAmountCents: true },
+    select: {
+      id: true,
+      name: true,
+      category: true,
+      story: true,
+      photoUrl: true,
+      birthYear: true,
+      monthlyAmountCents: true,
+    },
   });
 
   const radius = ctx.org.branding.buttonRadius ?? "full";
@@ -572,7 +620,10 @@ async function EventBlock({
       venue: true,
       startsAt: true,
       status: true,
-      ticketTypes: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, priceCents: true, quantity: true, sold: true, maxPerOrder: true } },
+      ticketTypes: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, name: true, priceCents: true, quantity: true, sold: true, maxPerOrder: true },
+      },
     },
   });
   if (!event) return <Notice>Evento não encontrado.</Notice>;

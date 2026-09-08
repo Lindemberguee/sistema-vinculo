@@ -11,6 +11,7 @@ import { CommunicationTab } from "@/components/campaign-editor/CommunicationTab"
 import { SettingsTab } from "@/components/campaign-editor/SettingsTab";
 import { LinksTab } from "@/components/campaign-editor/LinksTab";
 import { AmbassadorsTab } from "@/components/campaign-editor/AmbassadorsTab";
+import { PublicLinkCard } from "@/components/panel/PublicLinkCard";
 import { orgPublicOrigin } from "@/server/links/url";
 import { PageHeader, LinkButton, cn } from "@/components/ui";
 
@@ -83,7 +84,15 @@ export default async function CampaignSettings({
       },
       rewards: {
         orderBy: { sortOrder: "asc" },
-        select: { id: true, title: true, description: true, imageUrl: true, amountCents: true, quantity: true, claimed: true },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          imageUrl: true,
+          amountCents: true,
+          quantity: true,
+          claimed: true,
+        },
       },
       organization: {
         select: {
@@ -166,9 +175,14 @@ export default async function CampaignSettings({
         title={c.title}
         back={{ href: `/orgs/${orgId}/campaigns`, label: "Campanhas" }}
         actions={
-          <LinkButton href={`/orgs/${orgId}/campaigns/${campaignId}/editor`} variant="secondary" size="sm">
-            Editar página →
-          </LinkButton>
+          <>
+            <LinkButton href={`/orgs/${orgId}/campaigns/${campaignId}/preview`} variant="ghost" size="sm">
+              Pré-visualizar
+            </LinkButton>
+            <LinkButton href={`/orgs/${orgId}/campaigns/${campaignId}/editor`} variant="secondary" size="sm">
+              Editar página →
+            </LinkButton>
+          </>
         }
       />
 
@@ -176,7 +190,10 @@ export default async function CampaignSettings({
         <CampaignStatusControls orgId={orgId} campaignId={campaignId} status={c.status} />
       </div>
 
-      <nav className="mb-5 flex gap-1 overflow-x-auto border-b border-line">
+      <nav
+        aria-label="Configurações da campanha"
+        className="mb-5 flex gap-1 overflow-x-auto border-b border-line pb-px"
+      >
         {TABS.map((t) => (
           <Link
             key={t.key}
@@ -184,9 +201,7 @@ export default async function CampaignSettings({
             aria-current={t.key === tab ? "page" : undefined}
             className={cn(
               "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
-              t.key === tab
-                ? "border-brand-600 text-ink"
-                : "border-transparent text-muted hover:text-ink",
+              t.key === tab ? "border-brand-600 text-ink" : "border-transparent text-muted hover:text-ink",
             )}
           >
             {t.label}
@@ -207,7 +222,10 @@ export default async function CampaignSettings({
                 category: c.category,
                 summary: c.summary ?? "",
                 story: c.story ?? "",
-                galleryUrls: media.filter((m) => m.type === "image").map((m) => m.url).join("\n"),
+                galleryUrls: media
+                  .filter((m) => m.type === "image")
+                  .map((m) => m.url)
+                  .join("\n"),
                 videoUrl: media.find((m) => m.type === "video")?.url ?? "",
               }}
             />
@@ -343,6 +361,18 @@ export default async function CampaignSettings({
         </div>
 
         <aside className="lg:sticky lg:top-4 lg:self-start">
+          <div className="mb-4">
+            <PublicLinkCard
+              orgSlug={c.organization.slug}
+              customHost={c.organization.customDomains[0]?.host ?? null}
+              path={`/${c.slug}`}
+              note={
+                c.status === "PUBLISHED"
+                  ? "Compartilhe este endereço para receber doações."
+                  : "Publique a campanha para ativar este endereço."
+              }
+            />
+          </div>
           <div className="card p-4">
             <div className="flex items-baseline justify-between">
               <span className="eyebrow">Preenchimento</span>

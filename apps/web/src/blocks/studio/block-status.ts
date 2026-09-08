@@ -17,14 +17,25 @@ export function blockIssues(block: EditorBlock): string[] {
     if (empty) issues.push(f.label);
   }
 
-  if (issues.length === 0) {
-    const parsed = Block.safeParse(block);
-    if (!parsed.success) {
-      for (const i of parsed.error.issues) {
-        const key = i.path[1];
-        const field = EDITOR_FIELDS[block.type]?.find((f) => f.key === key);
-        issues.push(field ? field.label : (i.message ?? "campo inválido"));
-      }
+  if (block.type === "amountOptions") {
+    const amounts = Array.isArray(props.amountsCents) ? props.amountsCents : [];
+    if (typeof props.defaultIndex === "number" && props.defaultIndex >= amounts.length) {
+      issues.push("Valor selecionado por padrão");
+    }
+  }
+  if (block.type === "hero" && block.props.ctaTarget === "url" && !block.props.ctaUrl) issues.push("URL do botão");
+  if (block.type === "cta" && block.props.target === "url" && !block.props.url) issues.push("URL do botão");
+  if (block.type === "imageText" && block.props.ctaTarget === "url" && block.props.ctaLabel && !block.props.ctaUrl) {
+    issues.push("URL do botão");
+  }
+
+  const parsed = Block.safeParse(block);
+  if (!parsed.success) {
+    for (const i of parsed.error.issues) {
+      const key = i.path[1];
+      const field = EDITOR_FIELDS[block.type]?.find((f) => f.key === key);
+      const label = field ? field.label : (i.message ?? "campo inválido");
+      if (!issues.includes(label)) issues.push(label);
     }
   }
   return [...new Set(issues)];
