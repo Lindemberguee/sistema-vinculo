@@ -23,6 +23,7 @@ const BASE_DOMAIN = (process.env.APP_BASE_DOMAIN ?? "localhost:3000").toLowerCas
 const VERCEL_DEPLOYMENT_HOST = (
   (process.env.VERCEL_URL ?? "").replace(/^https?:\/\//, "").split(":")[0] ?? ""
 ).toLowerCase();
+const AUTH_PATHS = new Set(["/login", "/forgot", "/reset", "/register", "/verify"]);
 
 export const config = {
   matcher: ["/((?!_next/|api/|favicon.ico|robots.txt|sitemap.xml).*)"],
@@ -51,6 +52,10 @@ export function middleware(req: NextRequest) {
   }
 
   if (isAdmin) {
+    if (AUTH_PATHS.has(url.pathname)) {
+      url.pathname = `/panel${url.pathname}`;
+      return NextResponse.rewrite(url);
+    }
     url.pathname = `/admin${url.pathname === "/" ? "" : url.pathname}`;
     return NextResponse.rewrite(url);
   }
