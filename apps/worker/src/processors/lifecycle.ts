@@ -1,8 +1,6 @@
 import { prisma, renderOrgEmail, resolveOrgSender } from "@donation/db";
 import { sendEmail } from "@donation/emails";
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const scheme = APP_BASE.includes("localhost") ? "http" : "https";
+import { orgOrigin } from "../urls";
 
 /**
  * Win-back sweep: donors whose last paid donation was 120–180 days ago, with no
@@ -45,7 +43,7 @@ export async function runLifecycleEmails(): Promise<{ winback: number }> {
     }
 
     const camp = d.organization.campaigns[0]?.slug;
-    const donateUrl = `${scheme}://${d.organization.slug}.${APP_BASE}${camp ? `/${camp}` : ""}`;
+    const donateUrl = `${orgOrigin(d.organization.slug)}${camp ? `/${camp}` : ""}`;
 
     let sender = senders.get(d.organizationId);
     if (!sender) {

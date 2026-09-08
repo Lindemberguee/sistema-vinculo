@@ -3,11 +3,9 @@ import { prisma, renderOrgEmail, resolveOrgGateway, resolveOrgSender } from "@do
 import { formatBRL } from "@donation/shared";
 import { BYOG_FEE_CONFIG, calculateFees } from "@donation/payments";
 import { sendEmail } from "@donation/emails";
+import { orgOrigin } from "../urls";
 
 const nm = (n: string) => n.trim().split(/\s+/)[0] || n;
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const scheme = APP_BASE.includes("localhost") ? "http" : "https";
 
 const PIX_TTL_DAYS = 5;
 const REMINDER_AFTER_HOURS = 48;
@@ -82,7 +80,7 @@ async function billWinner(params: {
       data: { donationId, winnerDonorId: params.donorId, winningBidCents: params.bidCents },
     });
 
-    const payUrl = `${scheme}://${params.orgSlug}.${APP_BASE}/l/pagar/${donationId}`;
+    const payUrl = `${orgOrigin(params.orgSlug)}/l/pagar/${donationId}`;
     const [sender, email] = await Promise.all([
       resolveOrgSender(params.organizationId),
       renderOrgEmail(params.organizationId, "AUCTION_WON", {
@@ -229,7 +227,7 @@ export async function chaseUnpaidLots(): Promise<{ reminded: number; reoffered: 
         ? await prisma.donor.findUnique({ where: { id: lot.winnerDonorId }, select: { name: true, email: true } })
         : null;
       if (winner) {
-        const payUrl = `${scheme}://${org.slug}.${APP_BASE}/l/pagar/${d.id}`;
+        const payUrl = `${orgOrigin(org.slug)}/l/pagar/${d.id}`;
         const [sender, email] = await Promise.all([
           resolveOrgSender(lot.organizationId),
           renderOrgEmail(lot.organizationId, "AUCTION_PAYMENT_REMINDER", {

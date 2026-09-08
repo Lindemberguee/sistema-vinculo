@@ -10,6 +10,7 @@ const dt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "sh
 
 export default async function AdminUsersPage() {
   await requirePlatformAdminPage();
+  const appOrigin = appPanelOrigin();
 
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
@@ -84,7 +85,7 @@ export default async function AdminUsersPage() {
                     <div className="grid gap-1">
                       {u.memberships.length ? u.memberships.map((m) => (
                         <div key={`${u.id}-${m.organization.id}`} className="text-sm">
-                          <Link href={`/orgs/${m.organization.id}`} className="link">{m.organization.displayName}</Link>
+                          <Link href={`${appOrigin}/orgs/${m.organization.id}`} className="link">{m.organization.displayName}</Link>
                           <span className="text-muted"> · {m.role} · {m.organization.status}</span>
                         </div>
                       )) : <span className="text-sm text-muted">Sem organização</span>}
@@ -105,6 +106,13 @@ export default async function AdminUsersPage() {
       </Card>
     </main>
   );
+}
+
+function appPanelOrigin(): string {
+  const base = process.env.PUBLIC_APP_BASE_DOMAIN ?? process.env.APP_BASE_DOMAIN ?? "localhost:3000";
+  const host = base.startsWith("app.") || base.includes("localhost") ? base : `app.${base}`;
+  const scheme = host.includes("localhost") ? "http" : "https";
+  return `${scheme}://${host}`;
 }
 
 function Kpi({ label, value, detail }: { label: string; value: string; detail: string }) {

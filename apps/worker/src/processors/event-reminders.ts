@@ -1,8 +1,6 @@
 import { prisma, renderOrgEmail, resolveOrgSender } from "@donation/db";
 import { sendEmail } from "@donation/emails";
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const scheme = APP_BASE.includes("localhost") ? "http" : "https";
+import { orgOrigin } from "../urls";
 
 const LOOKAHEAD_HOURS = 30;
 
@@ -70,7 +68,7 @@ export async function sendEventReminders(): Promise<{ events: number; emails: nu
           EVENTO: ev.title,
           LOCAL: ev.address ? `${ev.venue} — ${ev.address}` : ev.venue,
           DATA: ev.startsAt.toLocaleString("pt-BR"),
-          LINK: `${scheme}://${ev.organization.slug}.${APP_BASE}/e/pedido/${donationId}`,
+          LINK: `${orgOrigin(ev.organization.slug)}/e/pedido/${donationId}`,
         });
         await sendEmail(d.email, email, { from: sender.from, replyTo: sender.replyTo });
         emails++;

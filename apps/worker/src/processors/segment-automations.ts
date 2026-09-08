@@ -7,10 +7,7 @@ import {
   signUnsubscribe,
 } from "@donation/db";
 import { sendEmail, type EmailTemplateKind } from "@donation/emails";
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const APP_SCHEME = APP_BASE.includes("localhost") ? "http" : "https";
-const appOrigin = APP_BASE.startsWith("app.") ? `${APP_SCHEME}://${APP_BASE}` : `${APP_SCHEME}://app.${APP_BASE}`;
+import { appOrigin, orgOrigin } from "../urls";
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
 const MATCH_CAP = 20_000;
@@ -109,7 +106,7 @@ export async function runSegmentAutomations(): Promise<{ segments: number; sent:
 
     const ctx = await ctxFor(rule.organizationId);
     const dedupKind = `segment-automation:${rule.id}`;
-    const link = `${APP_SCHEME}://${ctx.orgSlug}.${APP_BASE}`;
+    const link = orgOrigin(ctx.orgSlug);
     let ruleSent = 0;
 
     for (const { donorId } of due) {
@@ -134,7 +131,7 @@ export async function runSegmentAutomations(): Promise<{ segments: number; sent:
         ORGANIZACAO: ctx.orgName,
         LINK: link,
       });
-      const unsubUrl = `${appOrigin}/api/u/${signUnsubscribe(rule.organizationId, donorId)}`;
+      const unsubUrl = `${appOrigin()}/api/u/${signUnsubscribe(rule.organizationId, donorId)}`;
       try {
         await sendEmail(donor.email, email, {
           from: ctx.from,

@@ -2,12 +2,9 @@ import { Queue } from "bullmq";
 import { buildDonorWhere, parseDonorFilters, prisma, resolveOrgSender, signUnsubscribe } from "@donation/db";
 import { donorBroadcastEmail, sendEmail } from "@donation/emails";
 import { connection, QUEUE_NAMES } from "../queues";
+import { appOrigin } from "../urls";
 
 const BATCH = 200;
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const APP_SCHEME = APP_BASE.includes("localhost") ? "http" : "https";
-const appOrigin = APP_BASE.startsWith("app.") ? `${APP_SCHEME}://${APP_BASE}` : `${APP_SCHEME}://app.${APP_BASE}`;
 
 /**
  * Send a one-off donor broadcast. Iterates the donors matching the filter
@@ -79,7 +76,7 @@ export async function sendDonorBroadcast(broadcastId: string): Promise<{ sent: n
             status = "SKIPPED_DUPLICATE";
             skipped++;
           } else {
-            const unsubUrl = `${appOrigin}/api/u/${signUnsubscribe(b.organizationId, d.id)}`;
+            const unsubUrl = `${appOrigin()}/api/u/${signUnsubscribe(b.organizationId, d.id)}`;
             try {
               await sendEmail(
                 d.email,

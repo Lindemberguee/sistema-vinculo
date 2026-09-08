@@ -1,8 +1,6 @@
 import { prisma } from "@donation/db";
 import { sendEmail, campaignUpdateEmail } from "@donation/emails";
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const scheme = APP_BASE.includes("localhost") ? "http" : "https";
+import { orgOrigin } from "../urls";
 
 /**
  * E-mail a campaign "Novidade" to every donor who has a PAID donation to that
@@ -24,7 +22,7 @@ export async function sendCampaignUpdateEmails(campaignUpdateId: string): Promis
   });
   if (!update) return { sent: 0 };
 
-  const campaignUrl = `${scheme}://${update.campaign.organization.slug}.${APP_BASE}/${update.campaign.slug}`;
+  const campaignUrl = `${orgOrigin(update.campaign.organization.slug)}/${update.campaign.slug}`;
   const kind = `campaign-update:${campaignUpdateId}`;
 
   const donors = await prisma.donor.findMany({

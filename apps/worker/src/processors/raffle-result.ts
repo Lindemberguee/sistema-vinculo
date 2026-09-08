@@ -1,8 +1,6 @@
 import { prisma, renderOrgEmail, resolveOrgSender } from "@donation/db";
 import { sendEmail } from "@donation/emails";
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const scheme = APP_BASE.includes("localhost") ? "http" : "https";
+import { orgOrigin } from "../urls";
 
 /**
  * E-mail the draw result to every donor holding a PAID number in the raffle, so
@@ -22,7 +20,7 @@ export async function sendRaffleResultEmails(raffleId: string): Promise<{ sent: 
   });
   if (!raffle || raffle.status !== "DRAWN" || raffle.drawnNumber == null) return { sent: 0 };
 
-  const resultUrl = `${scheme}://${raffle.organization.slug}.${APP_BASE}/rifa/${raffleId}`;
+  const resultUrl = `${orgOrigin(raffle.organization.slug)}/rifa/${raffleId}`;
   const kind = `raffle-result:${raffleId}`;
 
   const donors = await prisma.donor.findMany({

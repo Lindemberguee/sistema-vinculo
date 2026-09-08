@@ -17,6 +17,8 @@ const SUB_TONE: Record<string, "success" | "warn" | "danger" | "neutral"> = {
 
 export default async function AdminOrgs() {
   await requirePlatformAdminPage();
+  const appOrigin = appPanelOrigin();
+  const publicBase = publicAppBaseDomain();
 
   const [orgs, plans, donationTotals] = await Promise.all([
     prisma.organization.findMany({
@@ -116,8 +118,8 @@ export default async function AdminOrgs() {
                     <Td>
                       <AdminOrgActions orgId={o.id} planId={o.planId} orgStatus={o.status} plans={plans} />
                       <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                        <Link href={`/orgs/${o.id}`} className="link">Abrir painel</Link>
-                        <Link href={`https://${o.slug}.${process.env.PUBLIC_APP_BASE_DOMAIN ?? process.env.APP_BASE_DOMAIN}`} target="_blank" className="link">Site público</Link>
+                        <Link href={`${appOrigin}/orgs/${o.id}`} className="link">Abrir painel</Link>
+                        <Link href={`${publicOriginForOrg(o.slug, publicBase)}`} target="_blank" className="link">Site público</Link>
                       </div>
                     </Td>
                   </Tr>
@@ -129,6 +131,22 @@ export default async function AdminOrgs() {
       </Card>
     </main>
   );
+}
+
+function publicAppBaseDomain(): string {
+  return process.env.PUBLIC_APP_BASE_DOMAIN ?? process.env.APP_BASE_DOMAIN ?? "localhost:3000";
+}
+
+function publicOriginForOrg(slug: string, base: string): string {
+  const scheme = base.includes("localhost") ? "http" : "https";
+  return `${scheme}://${slug}.${base}`;
+}
+
+function appPanelOrigin(): string {
+  const base = process.env.PUBLIC_APP_BASE_DOMAIN ?? process.env.APP_BASE_DOMAIN ?? "localhost:3000";
+  const host = base.startsWith("app.") || base.includes("localhost") ? base : `app.${base}`;
+  const scheme = host.includes("localhost") ? "http" : "https";
+  return `${scheme}://${host}`;
 }
 
 function Kpi({ label, value, detail }: { label: string; value: string; detail: string }) {
