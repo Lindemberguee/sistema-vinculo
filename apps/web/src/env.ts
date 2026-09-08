@@ -19,6 +19,8 @@ const schema = z.object({
   NEXTAUTH_URL: z.string().url(),
 
   APP_BASE_DOMAIN: z.string().min(3), // e.g. "localhost:3000" or "doacoes.com.br"
+  /** Public base used in shareable tenant URLs when the app listens behind a proxy. */
+  PUBLIC_APP_BASE_DOMAIN: optional(z.string().min(3)),
 
   /**
    * Public origin that inbound provider webhooks should hit (e.g. a Cloudflare

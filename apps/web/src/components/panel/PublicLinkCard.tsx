@@ -1,14 +1,13 @@
 import { CopyButton } from "@/components/public/CopyButton";
 import { Card, CardBody } from "@/components/ui";
-import { env } from "@/env";
+import { orgPublicOrigin } from "@/server/links/url";
 
 /**
  * "Página pública" card for the panel — shows the shareable URL of a standalone
  * public page (raffle result, event tickets, auction lots) with a copy button.
  */
 export function PublicLinkCard({ orgSlug, path, note }: { orgSlug: string; path: string; note?: string }) {
-  const scheme = env.APP_BASE_DOMAIN.includes("localhost") ? "http" : "https";
-  const url = `${scheme}://${orgSlug}.${env.APP_BASE_DOMAIN}${path}`;
+  const url = `${orgPublicOrigin({ slug: orgSlug })}${path}`;
   return (
     <Card>
       <CardBody>
