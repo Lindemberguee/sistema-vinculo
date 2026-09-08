@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useActionState, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { registerUser, type AuthActionResult } from "@/server/auth/actions";
@@ -9,7 +9,6 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { Field, Input, Button } from "@/components/ui";
 
 function RegisterForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/onboarding";
   const [state, action, pending] = useActionState<AuthActionResult | null, FormData>(registerUser, null);
@@ -24,14 +23,11 @@ function RegisterForm() {
     if (!password) return;
     setSigningIn(true);
     signIn("credentials", { email: state.email, password, redirect: false }).then((res) => {
-      if (res?.error) {
-        router.push("/login");
-        return;
-      }
-      router.push(callbackUrl);
-      router.refresh();
+      // Full-page navigation so the new session cookie is attached to the next
+      // request (a soft router.push can race the cookie and bounce to /login).
+      window.location.assign(res?.error ? "/login" : callbackUrl);
     });
-  }, [state, router, callbackUrl]);
+  }, [state, callbackUrl]);
 
   if (state?.ok) {
     return (
