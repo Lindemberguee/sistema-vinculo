@@ -14,6 +14,7 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "turbo run start",
+    "start:prod": "node scripts/start-prod.mjs",
     "lint": "turbo run lint",
     "lint:tokens": "node scripts/check-tokens.mjs",
     "test": "turbo run test",

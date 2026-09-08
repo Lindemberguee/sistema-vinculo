@@ -252,6 +252,21 @@ export class PagarmeGateway implements PaymentGateway {
       const a = Buffer.from(provided);
       const b = Buffer.from(this.config.webhookSecret);
       if (a.length !== b.length || !timingSafeEqual(a, b)) {
+        const [providedUser = "", providedPassword = ""] = provided.split(/:(.*)/s);
+        const [expectedUser = "", expectedPassword = ""] = this.config.webhookSecret.split(/:(.*)/s);
+        console.warn(
+          "[pagarme] invalid webhook auth",
+          JSON.stringify({
+            hasAuthorization: Boolean(header),
+            hasBasicAuthorization: Boolean(encoded),
+            providedUser,
+            expectedUser,
+            providedLength: provided.length,
+            expectedLength: this.config.webhookSecret.length,
+            providedPasswordLength: providedPassword.length,
+            expectedPasswordLength: expectedPassword.length,
+          }),
+        );
         throw new PaymentError("Invalid webhook auth");
       }
     }
