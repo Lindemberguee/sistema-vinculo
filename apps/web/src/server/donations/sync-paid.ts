@@ -29,6 +29,9 @@ export async function applySyncPaidAggregates(
     donorId: string;
     campaignId: string | null;
     amountCents: number;
+    donationLinkId?: string | null;
+    ambassadorId?: string | null;
+    rewardId?: string | null;
   },
 ): Promise<void> {
   if (opts.campaignId) {
@@ -51,6 +54,22 @@ export async function applySyncPaidAggregates(
       firstDonationAt: donor.firstDonationAt ?? new Date(),
     },
   });
+
+  if (opts.donationLinkId) {
+    await tx.donationLink.update({
+      where: { id: opts.donationLinkId },
+      data: { donationsCount: { increment: 1 }, raisedCents: { increment: opts.amountCents } },
+    });
+  }
+  if (opts.ambassadorId) {
+    await tx.campaignAmbassador.update({
+      where: { id: opts.ambassadorId },
+      data: { donationsCount: { increment: 1 }, raisedCents: { increment: opts.amountCents } },
+    });
+  }
+  if (opts.rewardId) {
+    await tx.campaignReward.update({ where: { id: opts.rewardId }, data: { claimed: { increment: 1 } } });
+  }
 
   await tx.auditLog.create({
     data: {
