@@ -3,7 +3,7 @@ import { Prisma, renderOrgEmail } from "@donation/db";
 import { sendEmail } from "@donation/emails";
 import { formatBRL } from "@donation/shared";
 import type { PaymentMethod } from "@donation/db";
-import { env } from "@/env";
+import { orgPublicOrigin } from "@/server/links/url";
 import { emitOutboundEvent } from "@/server/webhooks/emit";
 
 const METHOD_LABEL: Record<string, string> = { PIX: "Pix", CREDIT_CARD: "Cartão de crédito", BOLETO: "Boleto" };
@@ -97,15 +97,13 @@ export async function notifySyncPaid(opts: {
 
   if (opts.event) {
     try {
-      const base = env.APP_BASE_DOMAIN;
-      const sc = base.includes("localhost") ? "http" : "https";
       const email = await renderOrgEmail(opts.organizationId, "EVENT_TICKETS", {
         NOME: opts.donorName.trim().split(/\s+/)[0] || opts.donorName,
         ORGANIZACAO: opts.organizationName,
         EVENTO: opts.event.title,
         LOCAL: opts.event.venue,
         DATA: opts.event.startsAt.toLocaleString("pt-BR"),
-        LINK: `${sc}://${opts.organizationSlug}.${base}/e/pedido/${opts.donationId}`,
+        LINK: `${orgPublicOrigin({ slug: opts.organizationSlug })}/e/pedido/${opts.donationId}`,
       });
       await sendEmail(opts.donorEmail, email);
     } catch (e) {

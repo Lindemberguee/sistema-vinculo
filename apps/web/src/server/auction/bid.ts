@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { prisma, renderOrgEmail, resolveOrgSender } from "@donation/db";
 import { ConflictError, ForbiddenError, formatBRL, NotFoundError, ValidationError } from "@donation/shared";
 import { sendEmail } from "@donation/emails";
-import { env } from "@/env";
+import { orgPublicOrigin } from "@/server/links/url";
 import { extendedEndsAt, minNextBidCents, validateBid } from "./logic";
 
 export interface PlaceBidParams {
@@ -88,9 +88,7 @@ export async function placeBid(params: PlaceBidParams) {
     const prev = await prisma.donor.findUnique({ where: { id: prevBidderDonorId }, select: { name: true, email: true } });
     const org = await prisma.organization.findUnique({ where: { id: params.organizationId }, select: { displayName: true, slug: true } });
     if (prev && org) {
-      const base = env.APP_BASE_DOMAIN;
-      const scheme = base.includes("localhost") ? "http" : "https";
-      const bidUrl = `${scheme}://${org.slug}.${base}${lot.auction.campaign?.slug ? `/${lot.auction.campaign.slug}` : ""}`;
+      const bidUrl = `${orgPublicOrigin({ slug: org.slug })}${lot.auction.campaign?.slug ? `/${lot.auction.campaign.slug}` : ""}`;
       const [sender, email] = await Promise.all([
         resolveOrgSender(params.organizationId),
         renderOrgEmail(params.organizationId, "AUCTION_OUTBID", {

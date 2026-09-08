@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { formatBRL } from "@donation/shared";
 import { requireOrgAccessPage } from "@/server/auth-helpers";
-import { env } from "@/env";
+import { orgPublicOrigin } from "@/server/links/url";
 import { RaffleForm } from "@/components/RaffleForm";
 import { RaffleStatusControls, RaffleDrawForm } from "@/components/RaffleControls";
 import { CopyButton } from "@/components/public/CopyButton";
@@ -59,8 +59,7 @@ export default async function RaffleDetail({
     : null;
 
   const revenueCents = paid * raffle.ticketPriceCents;
-  const sc = env.APP_BASE_DOMAIN.includes("localhost") ? "http" : "https";
-  const resultUrl = `${sc}://${raffle.organization.slug}.${env.APP_BASE_DOMAIN}/rifa/${raffleId}`;
+  const resultUrl = `${orgPublicOrigin({ slug: raffle.organization.slug })}/rifa/${raffleId}`;
   const showResultUrl = raffle.status === "DRAWN" || raffle.status === "CLOSED";
 
   return (

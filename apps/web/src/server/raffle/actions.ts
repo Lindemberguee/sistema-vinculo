@@ -9,9 +9,9 @@ import { renderOrgEmail, resolveOrgSender } from "@donation/db";
 import { sendEmail } from "@donation/emails";
 import { requireOrgAccess } from "@/server/auth-helpers";
 import { assertModule } from "@/server/billing/limits";
+import { orgPublicOrigin } from "@/server/links/url";
 import { drawWinnerIndex } from "@/server/raffle/logic";
 import { enqueueRaffleResult } from "@/server/queue";
-import { env } from "@/env";
 
 export interface RaffleResult {
   ok: boolean;
@@ -175,8 +175,7 @@ export async function drawRaffle(orgId: string, raffleId: string, _seedInput: st
       },
     });
 
-    const sc = env.APP_BASE_DOMAIN.includes("localhost") ? "http" : "https";
-    const resultUrl = `${sc}://${raffle.organization.slug}.${env.APP_BASE_DOMAIN}/rifa/${raffleId}`;
+    const resultUrl = `${orgPublicOrigin({ slug: raffle.organization.slug })}/rifa/${raffleId}`;
 
     if (winner.donorId) {
       const donor = await db.donor.findFirst({ where: { id: winner.donorId }, select: { name: true, email: true } });
