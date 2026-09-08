@@ -2,7 +2,6 @@
 
 const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
 const PUBLIC_APP_BASE = process.env.PUBLIC_APP_BASE_DOMAIN ?? APP_BASE;
-const SCHEME = APP_BASE.includes("localhost") ? "http" : "https";
 const PUBLIC_SCHEME = PUBLIC_APP_BASE.includes("localhost") ? "http" : "https";
 
 /**
