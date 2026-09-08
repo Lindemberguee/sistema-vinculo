@@ -56,6 +56,9 @@ export function middleware(req: NextRequest) {
       url.pathname = `/panel${url.pathname}`;
       return NextResponse.rewrite(url);
     }
+    if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
+      return NextResponse.rewrite(url);
+    }
     url.pathname = `/admin${url.pathname === "/" ? "" : url.pathname}`;
     return NextResponse.rewrite(url);
   }

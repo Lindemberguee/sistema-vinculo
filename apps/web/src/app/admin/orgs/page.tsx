@@ -3,7 +3,7 @@ import { prisma } from "@donation/db";
 import { formatBRL } from "@donation/shared";
 import { requirePlatformAdminPage } from "@/server/admin-helpers";
 import { AdminOrgActions } from "@/components/admin/AdminOrgRow";
-import { PageHeader, Card, Table, Th, Td, Tr, StatusBadge, Badge } from "@/components/ui";
+import { PageHeader, Card, CardBody, Table, Th, Td, Tr, StatusBadge, Badge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -15,123 +15,122 @@ const SUB_TONE: Record<string, "success" | "warn" | "danger" | "neutral"> = {
   CANCELED: "neutral",
 };
 
-type AdminOrg = {
-  id: string;
-  displayName: string;
-  slug: string;
-  status: string;
-  planId: string;
-  plan: { monthlyCents: number } | null;
-  subscription: { status: string; currentPeriodEnd: Date; lastPaidAt: Date | null } | null;
-};
-
-type OrgBillingSummary = Pick<AdminOrg, "status" | "plan" | "subscription">;
-type AdminPlan = { id: string; name: string };
-
 export default async function AdminOrgs() {
   await requirePlatformAdminPage();
 
-  const [orgs, plans] = await Promise.all([
+  const [orgs, plans, donationTotals] = await Promise.all([
     prisma.organization.findMany({
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
         displayName: true,
+        legalName: true,
         slug: true,
         status: true,
+        kycStatus: true,
         planId: true,
+        createdAt: true,
         plan: { select: { name: true, monthlyCents: true } },
         subscription: { select: { status: true, currentPeriodEnd: true, lastPaidAt: true } },
+        paymentConfig: { select: { provider: true, verifiedAt: true, updatedAt: true } },
+        _count: { select: { campaigns: true, donors: true, donations: true, memberships: true } },
       },
     }),
     prisma.plan.findMany({ orderBy: { monthlyCents: "asc" }, select: { id: true, name: true } }),
+    prisma.donation.groupBy({
+      by: ["organizationId"],
+      where: { status: "PAID" },
+      _sum: { amountCents: true, tipCents: true, gatewayFeeCents: true, platformFeeCents: true },
+      _count: { _all: true },
+    }),
   ]);
 
-  const adminOrgs = orgs as AdminOrg[];
-  const adminPlans = plans as AdminPlan[];
-  const billingOrgs: OrgBillingSummary[] = adminOrgs;
-  const mrr = billingOrgs.reduce((sum: number, o: OrgBillingSummary) => {
-    const paying =
-      (o.plan?.monthlyCents ?? 0) > 0 &&
-      o.status === "ACTIVE" &&
-      (o.subscription?.status === "ACTIVE" || o.subscription?.status === "TRIALING");
-    return sum + (paying ? o.plan!.monthlyCents : 0);
-  }, 0);
-  const payingCount = billingOrgs.filter(
-    (o: OrgBillingSummary) => (o.plan?.monthlyCents ?? 0) > 0 && o.status === "ACTIVE" && o.subscription?.status === "ACTIVE",
-  ).length;
+  const totals = new Map(donationTotals.map((t) => [t.organizationId, t]));
+  const active = orgs.filter((o) => o.status === "ACTIVE").length;
+  const kycPending = orgs.filter((o) => ["SUBMITTED", "IN_REVIEW"].includes(o.kycStatus)).length;
+  const integrated = orgs.filter((o) => Boolean(o.paymentConfig?.verifiedAt)).length;
+  const gross = donationTotals.reduce((s, t) => s + (t._sum.amountCents ?? 0) + (t._sum.tipCents ?? 0), 0);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto max-w-7xl px-5 py-8">
       <PageHeader
-        title="Organizações e planos"
-        actions={
-          <Link href="/admin" className="link text-sm">
-            ← Fila de KYC
-          </Link>
-        }
+        title="Organizações"
+        description="Operação, planos, KYC, gateways e volume financeiro por cliente."
+        actions={<Link href="/admin" className="btn-secondary btn-sm no-underline">← Visão geral</Link>}
       />
 
-      <div className="mb-5 card p-5">
-        <dl className="flex flex-wrap gap-y-3 [&>*+*]:ml-8 [&>*+*]:border-l [&>*+*]:border-line [&>*+*]:pl-8">
-          <div>
-            <dt className="eyebrow">Organizações</dt>
-            <dd className="mt-0.5 text-lg font-semibold tabular-nums">{orgs.length}</dd>
-          </div>
-          <div>
-            <dt className="eyebrow">Em plano pago ativo</dt>
-            <dd className="mt-0.5 text-lg font-semibold tabular-nums">{payingCount}</dd>
-          </div>
-          <div>
-            <dt className="eyebrow">MRR</dt>
-            <dd className="mt-0.5 text-lg font-semibold tabular-nums">{formatBRL(mrr)}</dd>
-          </div>
-        </dl>
-      </div>
+      <section className="mb-5 grid gap-4 md:grid-cols-4">
+        <Kpi label="Organizações" value={orgs.length.toString()} detail={`${active} ativas`} />
+        <Kpi label="KYC pendente" value={kycPending.toString()} detail="enviadas ou em análise" />
+        <Kpi label="Gateways OK" value={`${integrated}/${orgs.length}`} detail="contas conectadas" />
+        <Kpi label="Volume total" value={formatBRL(gross)} detail="doações pagas" />
+      </section>
 
       <Card className="overflow-hidden">
-        <Table>
-          <thead>
-            <Tr>
-              <Th>Organização</Th>
-              <Th>Org</Th>
-              <Th>Assinatura</Th>
-              <Th>Vencimento</Th>
-              <Th>Pago em</Th>
-              <Th className="w-72">Plano / ações</Th>
-            </Tr>
-          </thead>
-          <tbody>
-            {adminOrgs.map((o) => (
-              <Tr key={o.id}>
-                <Td>
-                  <div className="font-medium">{o.displayName}</div>
-                  <div className="text-xs text-muted">{o.slug}</div>
-                </Td>
-                <Td>
-                  <StatusBadge status={o.status} />
-                </Td>
-                <Td>
-                  {o.subscription ? (
-                    <Badge tone={SUB_TONE[o.subscription.status] ?? "neutral"}>{o.subscription.status}</Badge>
-                  ) : (
-                    <span className="text-xs text-faint">—</span>
-                  )}
-                </Td>
-                <Td className="text-sm">
-                  {o.subscription ? dt.format(o.subscription.currentPeriodEnd) : "—"}
-                </Td>
-                <Td className="text-sm">
-                  {o.subscription?.lastPaidAt ? dt.format(o.subscription.lastPaidAt) : "—"}
-                </Td>
-                <Td>
-                  <AdminOrgActions orgId={o.id} planId={o.planId} orgStatus={o.status} plans={adminPlans} />
-                </Td>
+        <CardBody className="p-0">
+          <Table dense>
+            <thead>
+              <Tr>
+                <Th>Organização</Th>
+                <Th>Status</Th>
+                <Th>Gateway</Th>
+                <Th>Uso</Th>
+                <Th>Volume / taxas</Th>
+                <Th>Assinatura</Th>
+                <Th className="min-w-72">Ações</Th>
               </Tr>
-            ))}
-          </tbody>
-        </Table>
+            </thead>
+            <tbody>
+              {orgs.map((o) => {
+                const t = totals.get(o.id);
+                const total = (t?._sum.amountCents ?? 0) + (t?._sum.tipCents ?? 0);
+                const fees = (t?._sum.gatewayFeeCents ?? 0) + (t?._sum.platformFeeCents ?? 0);
+                return (
+                  <Tr key={o.id}>
+                    <Td>
+                      <div className="font-medium">{o.displayName}</div>
+                      <div className="text-xs text-muted">{o.slug} · {o.legalName}</div>
+                      <div className="mt-1 text-[0.68rem] text-faint">Criada em {dt.format(o.createdAt)}</div>
+                    </Td>
+                    <Td>
+                      <div className="grid gap-1"><StatusBadge status={o.status} /><StatusBadge status={o.kycStatus} /></div>
+                    </Td>
+                    <Td>
+                      {o.paymentConfig ? (
+                        <div className="grid gap-1 text-xs"><Badge tone={o.paymentConfig.verifiedAt ? "success" : "warn"}>{o.paymentConfig.provider}</Badge><span className="text-muted">{o.paymentConfig.verifiedAt ? `verificado ${dt.format(o.paymentConfig.verifiedAt)}` : "sem verificação"}</span></div>
+                      ) : <Badge>Sem gateway</Badge>}
+                    </Td>
+                    <Td className="text-sm">
+                      <div>{o._count.campaigns} campanhas</div>
+                      <div className="text-muted">{o._count.donors} doadores · {o._count.memberships} usuários</div>
+                    </Td>
+                    <Td>
+                      <div className="font-semibold tabular-nums">{formatBRL(total)}</div>
+                      <div className="text-xs text-muted">{t?._count._all ?? 0} doações · taxas {formatBRL(fees)}</div>
+                    </Td>
+                    <Td>
+                      <div className="font-medium">{o.plan.name}</div>
+                      <div className="text-xs text-muted">{formatBRL(o.plan.monthlyCents)}/mês</div>
+                      {o.subscription ? <Badge tone={SUB_TONE[o.subscription.status] ?? "neutral"}>{o.subscription.status}</Badge> : <div className="text-xs text-faint">sem assinatura</div>}
+                    </Td>
+                    <Td>
+                      <AdminOrgActions orgId={o.id} planId={o.planId} orgStatus={o.status} plans={plans} />
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <Link href={`/orgs/${o.id}`} className="link">Abrir painel</Link>
+                        <Link href={`https://${o.slug}.${process.env.PUBLIC_APP_BASE_DOMAIN ?? process.env.APP_BASE_DOMAIN}`} target="_blank" className="link">Site público</Link>
+                      </div>
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        </CardBody>
       </Card>
     </main>
   );
+}
+
+function Kpi({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="card p-5"><p className="eyebrow">{label}</p><p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p><p className="mt-1 text-xs text-muted">{detail}</p></div>;
 }
