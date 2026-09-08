@@ -2,10 +2,7 @@ import { prisma, renderOrgEmail, resolveOrgSender, signUnsubscribe } from "@dona
 import { sendEmail } from "@donation/emails";
 import { formatBRL } from "@donation/shared";
 import { manageUrl } from "../donations";
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const APP_SCHEME = APP_BASE.includes("localhost") ? "http" : "https";
-const appOrigin = APP_BASE.startsWith("app.") ? `${APP_SCHEME}://${APP_BASE}` : `${APP_SCHEME}://app.${APP_BASE}`;
+import { appOrigin } from "../urls";
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
 const daysFromNow = (n: number) => new Date(Date.now() + n * 86_400_000);
@@ -54,7 +51,7 @@ async function deliver(
     ORGANIZACAO: ctx.orgName,
     ...vars,
   });
-  const unsubUrl = `${appOrigin}/api/u/${signUnsubscribe(organizationId, donor.id)}`;
+  const unsubUrl = `${appOrigin()}/api/u/${signUnsubscribe(organizationId, donor.id)}`;
   await sendEmail(donor.email, email, {
     from: ctx.sender.from,
     replyTo: ctx.sender.replyTo,

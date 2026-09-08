@@ -1,8 +1,6 @@
 import { prisma, renderOrgEmail, resolveOrgSender } from "@donation/db";
 import { sendEmail } from "@donation/emails";
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const scheme = APP_BASE.includes("localhost") ? "http" : "https";
+import { orgOrigin } from "../urls";
 
 /** Send a freshly created ambassador their public share link + private manage link. */
 export async function sendAmbassadorWelcome(ambassadorId: string): Promise<{ sent: boolean }> {
@@ -25,7 +23,7 @@ export async function sendAmbassadorWelcome(ambassadorId: string): Promise<{ sen
   if (!amb) return { sent: false };
 
   const orgId = amb.campaign.organizationId;
-  const origin = `${scheme}://${amb.campaign.organization.slug}.${APP_BASE}`;
+  const origin = orgOrigin(amb.campaign.organization.slug);
 
   const [sender, email] = await Promise.all([
     resolveOrgSender(orgId),

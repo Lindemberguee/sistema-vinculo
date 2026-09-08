@@ -1,10 +1,7 @@
 import { prisma, renderOrgEmail, resolveOrgSender, signUnsubscribe } from "@donation/db";
 import { sendEmail } from "@donation/emails";
 import { formatBRL } from "@donation/shared";
-
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const APP_SCHEME = APP_BASE.includes("localhost") ? "http" : "https";
-const appOrigin = APP_BASE.startsWith("app.") ? `${APP_SCHEME}://${APP_BASE}` : `${APP_SCHEME}://app.${APP_BASE}`;
+import { appOrigin } from "../urls";
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
 
@@ -65,7 +62,7 @@ export async function runAnnualStatements(year: number): Promise<{ orgs: number;
         TOTAL: formatBRL(total),
         QTD: String(g._count._all),
       });
-      const unsubUrl = `${appOrigin}/api/u/${signUnsubscribe(organizationId, g.donorId)}`;
+      const unsubUrl = `${appOrigin()}/api/u/${signUnsubscribe(organizationId, g.donorId)}`;
       try {
         await sendEmail(donor.email, email, {
           from: sender.from,

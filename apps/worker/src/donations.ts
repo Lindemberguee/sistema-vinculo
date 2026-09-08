@@ -20,11 +20,10 @@ const METHOD_LABEL: Record<string, string> = {
 const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
 import { BYOG_FEE_CONFIG, calculateFees } from "@donation/payments";
 import { emitEvent } from "./events";
+import { appOrigin, orgOrigin } from "./urls";
 
-const APP_BASE = process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-const scheme = APP_BASE.includes("localhost") ? "http" : "https";
 /** Donor self-service manage/cancel link. */
-export const manageUrl = (cancelToken: string) => `${scheme}://app.${APP_BASE}/r/${cancelToken}`;
+export const manageUrl = (cancelToken: string) => `${appOrigin()}/r/${cancelToken}`;
 
 const MAX_DUNNING_ATTEMPTS = 3;
 
@@ -181,7 +180,7 @@ async function sendEventTickets(chargeId: string): Promise<void> {
   });
   if (!donation || donation.eventTickets.length === 0) return;
   const ev = donation.eventTickets[0]!.event;
-  const ordersUrl = `${scheme}://${donation.organization.slug}.${APP_BASE}/e/pedido/${donation.id}`;
+  const ordersUrl = `${orgOrigin(donation.organization.slug)}/e/pedido/${donation.id}`;
   const [sender, email] = await Promise.all([
     resolveOrgSender(donation.organizationId),
     renderOrgEmail(donation.organizationId, "EVENT_TICKETS", {
@@ -420,8 +419,8 @@ export async function markChargeStatus(chargeId: string, status: DonationStatus)
       if (await isEmailTemplateEnabled(donation.organizationId, "DONATION_DECLINED")) {
         const sender = await resolveOrgSender(donation.organizationId);
         const link = donation.campaign
-          ? `${scheme}://${donation.organization.slug}.${APP_BASE}/${donation.campaign.slug}`
-          : `${scheme}://${donation.organization.slug}.${APP_BASE}`;
+          ? `${orgOrigin(donation.organization.slug)}/${donation.campaign.slug}`
+          : orgOrigin(donation.organization.slug);
         const email = await renderOrgEmail(donation.organizationId, "DONATION_DECLINED", {
           NOME: firstName(donation.donor.name),
           ORGANIZACAO: donation.organization.displayName,
