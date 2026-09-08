@@ -35,7 +35,11 @@ export function EssentialTab({
   return (
     <form action={action} className="space-y-5">
       <SectionCard title="Conteúdo" desc="Apresente o projeto com clareza e impacto.">
-        <Field label="Nome da campanha" error={err("title")} hint="Curto e direto. Aparece na busca e no compartilhamento.">
+        <Field
+          label="Nome da campanha"
+          error={err("title")}
+          hint="Curto e direto. Aparece na busca e no compartilhamento."
+        >
           <Input name="title" defaultValue={initial.title} maxLength={120} required />
         </Field>
         <Field label="Slogan" error={err("slogan")} hint="Uma frase que completa o título. Opcional.">
@@ -76,15 +80,7 @@ export function EssentialTab({
   );
 }
 
-export function SectionCard({
-  title,
-  desc,
-  children,
-}: {
-  title: string;
-  desc?: string;
-  children: React.ReactNode;
-}) {
+export function SectionCard({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (
     <section className="card p-5">
       <h2 className="text-sm font-semibold">{title}</h2>
@@ -96,12 +92,20 @@ export function SectionCard({
 
 export function SaveBar({ state, pending }: { state: ActionResult | null; pending: boolean }) {
   return (
-    <div className="flex items-center gap-3">
-      <Button type="submit" disabled={pending}>
-        {pending ? "Salvando…" : "Salvar"}
+    <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+      <Button type="submit" loading={pending}>
+        {pending ? "Salvando…" : "Salvar alterações"}
       </Button>
-      {state?.ok && <span className="text-sm text-success">Salvo.</span>}
-      {state?.error && <span className="field-error">{state.error}</span>}
+      {state?.ok && (
+        <span className="text-sm text-success" role="status" aria-live="polite">
+          Alterações salvas.
+        </span>
+      )}
+      {state?.error && (
+        <span className="field-error" role="alert">
+          {state.error}
+        </span>
+      )}
     </div>
   );
 }

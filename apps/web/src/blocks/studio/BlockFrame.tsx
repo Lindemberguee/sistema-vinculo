@@ -54,7 +54,7 @@ function BlockFrameImpl({
   const label = BLOCK_REGISTRY[block.type].label;
   const incomplete = isBlockIncomplete(block);
   const iconBtn =
-    "grid size-7 place-items-center rounded text-white/90 transition-colors hover:bg-white/15 focus-visible:bg-white/20 disabled:opacity-40 focus:outline-none";
+    "grid size-8 place-items-center rounded text-white/90 transition-colors hover:bg-white/15 focus-visible:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:opacity-40";
   const chromeVis = cn(
     "transition-opacity",
     selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
@@ -71,9 +71,7 @@ function BlockFrameImpl({
       <div
         className={cn(
           "relative transition-shadow",
-          selected
-            ? "ring-2 ring-brand-500 ring-inset"
-            : "ring-1 ring-transparent ring-inset hover:ring-brand-200",
+          selected ? "ring-2 ring-brand-500 ring-inset" : "ring-1 ring-transparent ring-inset hover:ring-brand-200",
         )}
       >
         {/* label */}
@@ -90,7 +88,12 @@ function BlockFrameImpl({
         </span>
 
         {/* toolbar */}
-        <div className={cn("absolute -top-3.5 right-3 z-30 flex items-center gap-1 rounded-md bg-ink px-1 py-1", chromeVis)}>
+        <div
+          className={cn(
+            "absolute -top-3.5 right-3 z-30 flex items-center gap-1 rounded-md bg-ink px-1 py-1",
+            chromeVis,
+          )}
+        >
           <button
             type="button"
             aria-label={`Arrastar “${label}” para reordenar`}
@@ -154,7 +157,7 @@ function BlockFrameImpl({
           aria-label={`Selecionar bloco ${label}`}
           aria-pressed={selected}
           onClick={onSelect}
-          className="absolute inset-0 z-20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 focus:outline-none"
+          className="absolute inset-0 z-20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 focus-visible:outline-none"
         />
       </div>
     </div>

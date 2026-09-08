@@ -199,6 +199,7 @@ export function Studio({
     if (window.matchMedia("(min-width: 1024px)").matches) paletteSearchRef.current?.focus();
     else setMobilePane("palette");
   }, []);
+  const closeMobilePane = useCallback(() => setMobilePane(null), []);
 
   async function onPublish() {
     setPublishing(true);
@@ -213,25 +214,22 @@ export function Studio({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Editor da página — ${campaignTitle}`}
-      className="fixed inset-0 z-40 flex flex-col bg-canvas"
-    >
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line-strong bg-surface px-3 lg:px-4">
+    <div className="fixed inset-0 z-40 flex flex-col bg-canvas">
+      <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-line-strong bg-surface px-2 sm:gap-3 sm:px-3 lg:px-4">
         <Link
           href={backUrl}
-          className="flex shrink-0 items-center gap-1 text-[0.8125rem] font-medium text-muted transition-colors hover:text-ink"
+          className="flex min-h-10 shrink-0 items-center gap-1 rounded-md px-1 text-[0.8125rem] font-medium text-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         >
-          <ChevronLeft className="size-4" /> Sair
+          <ChevronLeft className="size-4" aria-hidden /> <span className="hidden sm:inline">Sair</span>
         </Link>
-        <span className="hidden min-w-0 flex-1 truncate text-sm font-semibold sm:block">{campaignTitle}</span>
+        <h1 className="sr-only min-w-0 flex-1 truncate text-sm font-semibold md:not-sr-only md:block">
+          {campaignTitle}
+        </h1>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
           <SaveIndicator state={save} msg={saveMsg} />
 
-          <div className="flex items-center rounded-full border border-line-strong p-0.5">
+          <div className="hidden items-center rounded-full border border-line-strong p-0.5 sm:flex">
             <IconToggle
               active={state.device === "desktop"}
               label="Visão desktop"
@@ -279,11 +277,11 @@ export function Studio({
             href={previewUrl}
             target="_blank"
             rel="noreferrer"
-            className="btn-secondary btn-sm hidden no-underline md:inline-flex"
+            className="btn-secondary btn-sm hidden no-underline lg:inline-flex"
           >
             Pré-visualizar <ExternalLink className="size-3.5" />
           </a>
-          <Button size="sm" onClick={onPublish} disabled={publishing}>
+          <Button size="sm" onClick={onPublish} loading={publishing}>
             {publishing ? "Publicando…" : "Publicar"}
           </Button>
 
@@ -303,6 +301,8 @@ export function Studio({
 
       {publishMsg && (
         <p
+          role={publishMsg.ok ? "status" : "alert"}
+          aria-live="polite"
           className={cn(
             "shrink-0 px-4 py-1.5 text-xs",
             publishMsg.ok ? "bg-success-bg text-success" : "bg-danger-bg text-danger",
@@ -324,7 +324,7 @@ export function Studio({
             <Palette dispatch={dispatch} searchRef={paletteSearchRef} />
           </aside>
 
-          <main className="min-h-0">
+          <section aria-label="Canvas da campanha" className="min-h-0">
             <Canvas
               blocks={state.blocks}
               selectedId={state.selectedId}
@@ -334,7 +334,7 @@ export function Studio({
               dispatch={dispatch}
               onAddClick={onAddClick}
             />
-          </main>
+          </section>
 
           <aside className="hidden min-h-0 lg:block">
             <Inspector
@@ -354,7 +354,7 @@ export function Studio({
           <MobileDrawer
             side={mobilePane === "palette" ? "left" : "right"}
             title={mobilePane === "palette" ? "Adicionar bloco" : "Configurações"}
-            onClose={() => setMobilePane(null)}
+            onClose={closeMobilePane}
           >
             {mobilePane === "palette" ? (
               <Palette dispatch={dispatch} searchRef={paletteSearchRef} />
@@ -397,9 +397,41 @@ function MobileDrawer({
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
   useEffect(() => {
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     ref.current?.querySelector<HTMLElement>("input, button")?.focus();
-  }, []);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !ref.current) return;
+      const focusable = Array.from(
+        ref.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (!focusable.length) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.documentElement.classList.add("overflow-hidden");
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.documentElement.classList.remove("overflow-hidden");
+      opener.current?.focus();
+    };
+  }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-ink/30" onClick={onClose} />

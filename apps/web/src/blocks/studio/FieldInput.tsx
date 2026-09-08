@@ -35,7 +35,7 @@ export function FieldInput({
             inputMode="url"
             placeholder="https://…"
             value={(value as string) ?? ""}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => onChange(e.target.value || undefined)}
           />
           <Thumb url={(value as string) ?? ""} />
         </Field>
@@ -106,13 +106,70 @@ export function FieldInput({
         </Field>
       );
 
+    case "multiSelect":
+      return (
+        <fieldset className="grid gap-2">
+          <legend className="label">{label}</legend>
+          {field.hint && <p className="hint">{field.hint}</p>}
+          <div className="grid gap-1.5 rounded-lg border border-line p-2.5">
+            {field.options.map((option) => {
+              const values = Array.isArray(value) ? (value as unknown[]).map(String) : [];
+              return (
+                <label
+                  key={option.value}
+                  className="flex min-h-10 items-center gap-2 rounded-md px-1 text-sm hover:bg-canvas"
+                >
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-brand-600"
+                    checked={values.includes(option.value)}
+                    onChange={(event) =>
+                      onChange(
+                        event.target.checked ? [...values, option.value] : values.filter((v) => v !== option.value),
+                      )
+                    }
+                  />
+                  {option.label}
+                </label>
+              );
+            })}
+          </div>
+          {error && (
+            <span className="field-error" role="alert">
+              {error}
+            </span>
+          )}
+        </fieldset>
+      );
+
+    case "numberList":
+      return (
+        <RawTextField
+          label={label}
+          hint={field.hint ?? "Números inteiros separados por vírgula."}
+          error={error}
+          serialize={(arr) => (Array.isArray(arr) ? (arr as number[]) : []).join(", ")}
+          value={value}
+          onCommit={(raw) =>
+            onChange(
+              raw
+                .split(",")
+                .map((s) => Math.round(Number(s.trim())))
+                .filter((n) => Number.isInteger(n) && n > 0),
+            )
+          }
+        />
+      );
+
     case "centsList":
       return (
         <RawTextField
           label={label}
           hint={field.hint ?? "Valores em reais, separados por vírgula."}
           error={error}
-          serialize={(arr) => (arr as number[]).map((c) => (c / 100).toString().replace(".", ",")).join(", ")}
+          serialize={(arr) =>
+            (Array.isArray(arr) ? (arr as number[]) : []).map((c) => (c / 100).toString().replace(".", ",")).join(", ")
+          }
           value={value}
           onCommit={(raw) =>
             onChange(
@@ -132,9 +189,16 @@ export function FieldInput({
           hint={field.hint ?? "Um item por linha."}
           error={error}
           multiline
-          serialize={(arr) => (arr as string[]).join("\n")}
+          serialize={(arr) => (Array.isArray(arr) ? (arr as string[]) : []).join("\n")}
           value={value}
-          onCommit={(raw) => onChange(raw.split("\n").map((s) => s.trim()).filter(Boolean))}
+          onCommit={(raw) =>
+            onChange(
+              raw
+                .split("\n")
+                .map((s) => s.trim().toUpperCase())
+                .filter(Boolean),
+            )
+          }
         />
       );
 
@@ -177,15 +241,30 @@ export function FieldInput({
       return (
         <ListEditor
           label={label}
-          value={value as { quote: string; author: string; role?: string }[]}
-          blank={{ quote: "", author: "", role: "" }}
+          value={value as { quote: string; author: string; role?: string; avatarUrl?: string }[]}
+          blank={{ quote: "", author: "", role: "", avatarUrl: "" }}
           addLabel="Adicionar depoimento"
           onChange={onChange}
           row={(it, patch) => (
             <>
-              <Textarea rows={2} placeholder="Depoimento" value={it.quote} onChange={(e) => patch({ quote: e.target.value })} />
+              <Textarea
+                rows={2}
+                placeholder="Depoimento"
+                value={it.quote}
+                onChange={(e) => patch({ quote: e.target.value })}
+              />
               <Input placeholder="Nome" value={it.author} onChange={(e) => patch({ author: e.target.value })} />
-              <Input placeholder="Papel (opcional)" value={it.role ?? ""} onChange={(e) => patch({ role: e.target.value })} />
+              <Input
+                placeholder="Papel (opcional)"
+                value={it.role ?? ""}
+                onChange={(e) => patch({ role: e.target.value })}
+              />
+              <Input
+                type="url"
+                placeholder="URL da foto (opcional)"
+                value={it.avatarUrl ?? ""}
+                onChange={(e) => patch({ avatarUrl: e.target.value || undefined })}
+              />
             </>
           )}
         />
@@ -226,8 +305,17 @@ export function FieldInput({
           onChange={onChange}
           row={(it, patch) => (
             <>
-              <Input placeholder="Título do passo" value={it.title} onChange={(e) => patch({ title: e.target.value })} />
-              <Textarea rows={2} placeholder="Descrição" value={it.body} onChange={(e) => patch({ body: e.target.value })} />
+              <Input
+                placeholder="Título do passo"
+                value={it.title}
+                onChange={(e) => patch({ title: e.target.value })}
+              />
+              <Textarea
+                rows={2}
+                placeholder="Descrição"
+                value={it.body}
+                onChange={(e) => patch({ body: e.target.value })}
+              />
             </>
           )}
         />
@@ -243,7 +331,11 @@ export function FieldInput({
           onChange={onChange}
           row={(it, patch) => (
             <div className="flex gap-2">
-              <Input placeholder="Item (ex.: Projeto)" value={it.label} onChange={(e) => patch({ label: e.target.value })} />
+              <Input
+                placeholder="Item (ex.: Projeto)"
+                value={it.label}
+                onChange={(e) => patch({ label: e.target.value })}
+              />
               <Input
                 className="w-28"
                 inputMode="decimal"
