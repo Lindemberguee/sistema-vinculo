@@ -2,7 +2,19 @@
 
 import { useMemo, useRef, useState } from "react";
 import { tokenizeCard } from "./pagarme-browser";
-import { brl, Labeled, CardFields, checkoutBox, MethodChips, AwaitingPix } from "./checkout-ui";
+import {
+  brl,
+  Labeled,
+  CardFields,
+  BillingAddressFields,
+  emptyCard,
+  useBillingAddress,
+  buildCardData,
+  billingAddressBody,
+  checkoutBox,
+  MethodChips,
+  AwaitingPix,
+} from "./checkout-ui";
 
 const METHOD_LABELS = { PIX: "Pix", CREDIT_CARD: "Cartão", BOLETO: "Boleto" };
 
@@ -30,7 +42,8 @@ export function EventCheckout(props: EventCheckoutProps) {
   const [coverFee, setCoverFee] = useState(props.allowTip);
   const [donor, setDonor] = useState({ name: "", email: "", document: "", phone: "" });
   const [consentEmail, setConsentEmail] = useState(true);
-  const [card, setCard] = useState({ number: "", holderName: "", expMonth: "", expYear: "", cvv: "" });
+  const [card, setCard] = useState(emptyCard);
+  const { billing, setBilling, cepLoading, onCepBlur } = useBillingAddress();
 
   const [phase, setPhase] = useState<Phase>("form");
   const [error, setError] = useState<string | null>(null);
@@ -84,18 +97,30 @@ export function EventCheckout(props: EventCheckoutProps) {
       setError("Selecione ao menos um ingresso.");
       return;
     }
+    if ((method === "CREDIT_CARD" || method === "BOLETO") && donor.phone.replace(/\D/g, "").length < 10) {
+      setError("Informe um telefone com DDD.");
+      return;
+    }
+
+    let cardToken: string | undefined;
+    if (method === "CREDIT_CARD") {
+      const built = buildCardData(card, billing, donor.document);
+      if ("error" in built) {
+        setError(built.error);
+        return;
+      }
+      setPhase("submitting");
+      try {
+        cardToken = await tokenizeCard(props.pagarmePublicKey, built.data);
+      } catch (err) {
+        setPhase("failed");
+        setError(err instanceof Error ? err.message : "Não foi possível validar o cartão.");
+        return;
+      }
+    }
+
     setPhase("submitting");
     try {
-      let cardToken: string | undefined;
-      if (method === "CREDIT_CARD") {
-        cardToken = await tokenizeCard(props.pagarmePublicKey, {
-          number: card.number,
-          holderName: card.holderName,
-          expMonth: Number(card.expMonth),
-          expYear: Number(card.expYear),
-          cvv: card.cvv,
-        });
-      }
       const res = await fetch(`/api/public/events/${props.eventId}/order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -104,6 +129,7 @@ export function EventCheckout(props: EventCheckoutProps) {
           attendees: props.askAttendeeNames ? attendees.slice(0, totalTickets) : undefined,
           method,
           cardToken,
+          billingAddress: method === "CREDIT_CARD" ? billingAddressBody(billing) : undefined,
           tipCents,
           donor: {
             name: donor.name,
@@ -248,8 +274,10 @@ export function EventCheckout(props: EventCheckoutProps) {
       </div>
 
       {method === "CREDIT_CARD" && (
-        <div className="mt-3">
+        <div className="mt-3 grid gap-2.5">
           <CardFields card={card} onChange={setCard} />
+          <p className="mt-1 text-xs font-medium text-ink">Endereço de cobrança</p>
+          <BillingAddressFields value={billing} onChange={setBilling} onCepBlur={onCepBlur} loading={cepLoading} />
         </div>
       )}
 
@@ -261,7 +289,18 @@ export function EventCheckout(props: EventCheckoutProps) {
           <input className="input" type="email" value={donor.email} onChange={(e) => setDonor({ ...donor, email: e.target.value })} required />
         </Labeled>
         <Labeled label="CPF/CNPJ" optional>
-          <input className="input" value={donor.document} onChange={(e) => setDonor({ ...donor, document: e.target.value })} />
+          <input className="input" value={donor.document} onChange={(e) => setDonor({ ...donor, document: e.target.value })} inputMode="numeric" />
+        </Labeled>
+        <Labeled label="Telefone" optional={method === "PIX"}>
+          <input
+            className="input"
+            value={donor.phone}
+            onChange={(e) => setDonor({ ...donor, phone: e.target.value })}
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="(11) 99999-9999"
+            required={method !== "PIX"}
+          />
         </Labeled>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className="size-4 accent-brand-600" checked={consentEmail} onChange={(e) => setConsentEmail(e.target.checked)} />

@@ -2,12 +2,50 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { tokenizeCard } from "./pagarme-browser";
-import { brl, Labeled, CardFields, checkoutBox, MethodChips, AwaitingPix } from "./checkout-ui";
+import {
+  brl,
+  Labeled,
+  CardFields,
+  BillingAddressFields,
+  emptyCard,
+  useBillingAddress,
+  buildCardData,
+  billingAddressBody,
+  checkoutBox,
+  MethodChips,
+  AwaitingPix,
+} from "./checkout-ui";
 
 const METHOD_LABELS = { PIX: "Pix", CREDIT_CARD: "Cartão", BOLETO: "Boleto" };
 
 type Method = "PIX" | "CREDIT_CARD" | "BOLETO";
-type Phase = "form" | "submitting" | "awaiting_pix" | "awaiting_boleto" | "paid" | "subscribed" | "failed";
+type Phase =
+  | "form"
+  | "submitting"
+  | "awaiting_pix"
+  | "awaiting_boleto"
+  | "awaiting_card"
+  | "paid"
+  | "subscribed"
+  | "failed";
+
+/** Map a raw acquirer/gateway reason to something a donor can act on. */
+function friendlyDecline(reason?: string): string {
+  const r = (reason ?? "").toLowerCase();
+  if (!r) return "Pagamento não autorizado pelo emissor do cartão.";
+  if (r.includes("insufficient") || r.includes("saldo") || r.includes("funds"))
+    return "Cartão sem saldo/limite disponível.";
+  if (r.includes("expired") || r.includes("expirou") || r.includes("venc")) return "Cartão vencido.";
+  if (r.includes("cvv") || r.includes("security code") || r.includes("cvc"))
+    return "Código de segurança (CVV) incorreto.";
+  if (r.includes("billing") || r.includes("address") || r.includes("endereço"))
+    return "Endereço de cobrança inválido ou incompleto.";
+  if (r.includes("fraud") || r.includes("risk") || r.includes("antifraud"))
+    return "Pagamento não autorizado por segurança. Tente outro cartão.";
+  if (r.includes("do not honor") || r.includes("not honor") || r.includes("recus"))
+    return "Pagamento recusado pelo emissor do cartão. Tente outro cartão.";
+  return "Pagamento não autorizado. Verifique os dados ou tente outro cartão.";
+}
 
 export interface DonationCheckoutProps {
   campaignSlug: string;
@@ -116,7 +154,8 @@ export function DonationCheckout(props: DonationCheckoutProps) {
   const [anonymous, setAnonymous] = useState(false);
   const [consentEmail, setConsentEmail] = useState(true);
   const [consentWhatsapp, setConsentWhatsapp] = useState(false);
-  const [card, setCard] = useState({ number: "", holderName: "", expMonth: "", expYear: "", cvv: "" });
+  const [card, setCard] = useState(emptyCard);
+  const { billing, setBilling, cepLoading, onCepBlur } = useBillingAddress();
 
   const [phase, setPhase] = useState<Phase>("form");
   const [error, setError] = useState<string | null>(null);
@@ -172,20 +211,33 @@ export function DonationCheckout(props: DonationCheckoutProps) {
       setError(`Valor mínimo: ${brl(props.minAmountCents)}`);
       return;
     }
+
+    const needsPhone = method === "CREDIT_CARD" || method === "BOLETO";
+    if (needsPhone && donor.phone.replace(/\D/g, "").length < 10) {
+      setError("Informe um telefone com DDD.");
+      return;
+    }
+
+    let cardToken: string | undefined;
+    if (method === "CREDIT_CARD") {
+      const built = buildCardData(card, billing, donor.document);
+      if ("error" in built) {
+        setError(built.error);
+        return;
+      }
+      setPhase("submitting");
+      try {
+        cardToken = await tokenizeCard(props.pagarmePublicKey, built.data);
+      } catch (err) {
+        setPhase("failed");
+        setError(err instanceof Error ? err.message : "Não foi possível validar o cartão.");
+        return;
+      }
+    }
+
     setPhase("submitting");
 
     try {
-      let cardToken: string | undefined;
-      if (method === "CREDIT_CARD") {
-        cardToken = await tokenizeCard(props.pagarmePublicKey, {
-          number: card.number,
-          holderName: card.holderName,
-          expMonth: Number(card.expMonth),
-          expYear: Number(card.expYear),
-          cvv: card.cvv,
-        });
-      }
-
       const res = await fetch("/api/public/donations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,6 +257,7 @@ export function DonationCheckout(props: DonationCheckoutProps) {
               : undefined,
           installments: method === "CREDIT_CARD" ? installments : undefined,
           cardToken,
+          billingAddress: method === "CREDIT_CARD" ? billingAddressBody(billing) : undefined,
           anonymous,
           message: message || undefined,
           donor: {
@@ -232,7 +285,11 @@ export function DonationCheckout(props: DonationCheckoutProps) {
 
       if (!res.ok || !body.id) {
         setPhase("failed");
-        setError(body.message ?? body.error ?? "Não foi possível processar a doação.");
+        setError(
+          method === "CREDIT_CARD"
+            ? friendlyDecline(body.message ?? body.error)
+            : body.message ?? body.error ?? "Não foi possível processar a doação.",
+        );
         return;
       }
 
@@ -242,6 +299,9 @@ export function DonationCheckout(props: DonationCheckoutProps) {
         setPhase("subscribed");
       } else if (body.status === "PAID") {
         setPhase("paid");
+      } else if (body.status === "FAILED") {
+        setPhase("failed");
+        setError(friendlyDecline(body.message));
       } else if (method === "PIX") {
         setPhase("awaiting_pix");
         startPolling(body.id);
@@ -249,8 +309,9 @@ export function DonationCheckout(props: DonationCheckoutProps) {
         setPhase("awaiting_boleto");
         startPolling(body.id);
       } else {
-        setPhase("failed");
-        setError("Pagamento não autorizado.");
+        // CREDIT_CARD came back PENDING (3-D Secure / async auth) — confirmed by webhook.
+        setPhase("awaiting_card");
+        startPolling(body.id);
       }
     } catch (err) {
       setPhase("failed");
@@ -302,6 +363,21 @@ export function DonationCheckout(props: DonationCheckoutProps) {
           </p>
         )}
         <p className="mt-2 text-sm text-muted">A confirmação pode levar até 2 dias úteis.</p>
+      </div>
+    );
+  }
+
+  if (phase === "awaiting_card") {
+    return (
+      <div id="checkout" className={checkoutBox}>
+        <h3 className="text-base font-semibold">Confirmando o pagamento…</h3>
+        <p className="mt-1 text-sm text-muted">
+          Seu cartão está sendo autorizado. Isso costuma levar alguns segundos — não feche esta página.
+        </p>
+        <p className="mt-3 flex items-center gap-2 text-sm text-muted">
+          <span className="size-1.5 animate-pulse rounded-full bg-brand-500" />
+          Aguardando confirmação…
+        </p>
       </div>
     );
   }
@@ -450,6 +526,13 @@ export function DonationCheckout(props: DonationCheckoutProps) {
                 ))}
               </select>
             </Labeled>
+            <p className="mt-1 text-xs font-medium text-ink">Endereço de cobrança</p>
+            <BillingAddressFields
+              value={billing}
+              onChange={setBilling}
+              onCepBlur={onCepBlur}
+              loading={cepLoading}
+            />
           </div>
         )}
       </fieldset>
@@ -463,11 +546,25 @@ export function DonationCheckout(props: DonationCheckoutProps) {
           <Labeled label="E-mail">
             <input type="email" value={donor.email} onChange={(e) => setDonor({ ...donor, email: e.target.value })} required className="input" />
           </Labeled>
-          <Labeled label="CPF/CNPJ" optional>
-            <input value={donor.document} onChange={(e) => setDonor({ ...donor, document: e.target.value })} className="input" />
+          <Labeled label="CPF/CNPJ" optional={method !== "BOLETO"}>
+            <input
+              value={donor.document}
+              onChange={(e) => setDonor({ ...donor, document: e.target.value })}
+              className="input"
+              inputMode="numeric"
+              required={method === "BOLETO"}
+            />
           </Labeled>
-          <Labeled label="Telefone" optional>
-            <input value={donor.phone} onChange={(e) => setDonor({ ...donor, phone: e.target.value })} className="input" />
+          <Labeled label="Telefone" optional={method === "PIX"}>
+            <input
+              value={donor.phone}
+              onChange={(e) => setDonor({ ...donor, phone: e.target.value })}
+              className="input"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="(11) 99999-9999"
+              required={method !== "PIX"}
+            />
           </Labeled>
           <Labeled label="Mensagem" optional>
             <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} className="input" />

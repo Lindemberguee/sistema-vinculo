@@ -24,6 +24,16 @@ const bodySchema = z.object({
   ambassadorId: z.string().min(1).max(40).optional(),
   installments: z.number().int().min(1).max(12).optional(),
   cardToken: z.string().min(4).optional(),
+  /** Card / boleto billing address (acquirer requires it for card charges). */
+  billingAddress: z
+    .object({
+      line1: z.string().min(3).max(160),
+      line2: z.string().max(160).optional(),
+      zipCode: z.string().regex(/^\d{8}$/),
+      city: z.string().min(2).max(80),
+      state: z.string().regex(/^[A-Za-z]{2}$/),
+    })
+    .optional(),
   anonymous: z.boolean().default(false),
   message: z.string().max(500).optional(),
   dedication: z.object({ to: z.string().min(1).max(120), message: z.string().max(500).optional() }).optional(),
@@ -54,12 +64,26 @@ export async function POST(req: Request) {
   }
   const input = parsed.data;
 
-  if (input.method === "CREDIT_CARD" && !input.cardToken) {
-    return NextResponse.json({ error: "card_token_required" }, { status: 422 });
+  if (input.method === "CREDIT_CARD") {
+    if (!input.cardToken) {
+      return NextResponse.json({ error: "card_token_required" }, { status: 422 });
+    }
+    if (!input.billingAddress) {
+      return NextResponse.json(
+        { error: "billing_address_required", message: "Endereço de cobrança é obrigatório para cartão." },
+        { status: 422 },
+      );
+    }
+    if (!input.donor.phone || input.donor.phone.replace(/\D/g, "").length < 10) {
+      return NextResponse.json(
+        { error: "phone_required", message: "Telefone com DDD é obrigatório para pagamento com cartão." },
+        { status: 422 },
+      );
+    }
   }
 
   try {
-    const { donation, recurring } = await createDonation({
+    const { donation, recurring, declineReason } = await createDonation({
       organizationId: tenant.organizationId,
       campaignSlug: input.campaignSlug,
       amountCents: input.amountCents,
@@ -72,6 +96,7 @@ export async function POST(req: Request) {
       ambassadorId: input.ambassadorId,
       installments: input.installments,
       cardToken: input.cardToken,
+      billingAddress: input.billingAddress,
       anonymous: input.anonymous,
       message: input.message,
       dedication: input.dedication,
@@ -88,6 +113,7 @@ export async function POST(req: Request) {
       recurring,
       // A card subscription has no immediate charge to poll; confirmation is by e-mail.
       subscription: recurring && input.method === "CREDIT_CARD",
+      ...(declineReason ? { message: declineReason } : {}),
     });
   } catch (err) {
     if (isAppError(err)) {

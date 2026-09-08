@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
+import { lookupCep, validateCard, type CardData } from "./pagarme-browser";
 import { CopyButton } from "@/components/public/CopyButton";
 
 export const brl = (c: number) =>
@@ -36,9 +37,107 @@ export function Labeled({
 export interface CardState {
   number: string;
   holderName: string;
+  holderDocument: string;
   expMonth: string;
   expYear: string;
   cvv: string;
+}
+
+export interface BillingAddressState {
+  zipCode: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
+export const emptyBillingAddress: BillingAddressState = {
+  zipCode: "",
+  street: "",
+  number: "",
+  complement: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+};
+
+export const emptyCard: CardState = {
+  number: "",
+  holderName: "",
+  holderDocument: "",
+  expMonth: "",
+  expYear: "",
+  cvv: "",
+};
+
+/** State + CEP auto-fill for the card billing address, shared by every checkout. */
+export function useBillingAddress() {
+  const [billing, setBilling] = useState<BillingAddressState>(emptyBillingAddress);
+  const [cepLoading, setCepLoading] = useState(false);
+
+  const onCepBlur = useCallback(async (rawCep: string) => {
+    if (rawCep.replace(/\D/g, "").length !== 8) return;
+    setCepLoading(true);
+    try {
+      const found = await lookupCep(rawCep);
+      if (found) {
+        setBilling((b) => ({
+          ...b,
+          street: found.street || b.street,
+          neighborhood: found.neighborhood || b.neighborhood,
+          city: found.city || b.city,
+          state: found.state || b.state,
+        }));
+      }
+    } finally {
+      setCepLoading(false);
+    }
+  }, []);
+
+  return { billing, setBilling, cepLoading, onCepBlur };
+}
+
+/**
+ * Turn the checkout's card + billing form state into the `CardData` the browser
+ * tokenizer needs. `fallbackDocument` is the donor's CPF (used when the card
+ * form's own holder-document field is left blank). Returns a validation error
+ * string, or the ready `CardData`.
+ */
+export function buildCardData(
+  card: CardState,
+  billing: BillingAddressState,
+  fallbackDocument?: string,
+): { error: string } | { data: CardData } {
+  const data: CardData = {
+    number: card.number,
+    holderName: card.holderName,
+    holderDocument: card.holderDocument || fallbackDocument || undefined,
+    expMonth: Number(card.expMonth),
+    expYear: Number(card.expYear),
+    cvv: card.cvv,
+    billingAddress: {
+      line1: [billing.number, billing.street, billing.neighborhood].filter(Boolean).join(", "),
+      line2: billing.complement || undefined,
+      zipCode: billing.zipCode,
+      city: billing.city,
+      state: billing.state,
+    },
+  };
+  const err = validateCard(data);
+  return err ? { error: err } : { data };
+}
+
+/** The billing-address payload shape our donation/event/raffle APIs accept. */
+export function billingAddressBody(billing: BillingAddressState) {
+  return {
+    line1: [billing.number, billing.street, billing.neighborhood].filter(Boolean).join(", "),
+    line2: billing.complement || undefined,
+    zipCode: billing.zipCode.replace(/\D/g, ""),
+    city: billing.city,
+    state: billing.state.toUpperCase().slice(0, 2),
+  };
 }
 
 /** Labeled credit-card inputs. Tokenized in the browser — never posted to our API. */
@@ -68,6 +167,16 @@ export function CardFields({
           value={card.holderName}
           onChange={(e) => set({ holderName: e.target.value })}
           autoComplete="cc-name"
+          required
+        />
+      </Labeled>
+      <Labeled label="CPF do titular">
+        <input
+          className="input"
+          value={card.holderDocument}
+          onChange={(e) => set({ holderDocument: e.target.value })}
+          inputMode="numeric"
+          autoComplete="off"
           required
         />
       </Labeled>
@@ -101,6 +210,101 @@ export function CardFields({
             onChange={(e) => set({ cvv: e.target.value })}
             inputMode="numeric"
             autoComplete="cc-csc"
+            required
+          />
+        </Labeled>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Billing address for card / boleto. CEP auto-fills street/neighborhood/city/UF
+ * (all stay editable); the acquirer requires this for card charges.
+ */
+export function BillingAddressFields({
+  value,
+  onChange,
+  onCepBlur,
+  loading,
+}: {
+  value: BillingAddressState;
+  onChange: (next: BillingAddressState) => void;
+  onCepBlur: (cep: string) => void;
+  loading?: boolean;
+}) {
+  const set = (patch: Partial<BillingAddressState>) => onChange({ ...value, ...patch });
+  return (
+    <div className="grid gap-2.5">
+      <div className="grid grid-cols-[7rem_1fr] gap-2">
+        <Labeled label="CEP" hint={loading ? "Buscando…" : undefined}>
+          <input
+            className="input"
+            value={value.zipCode}
+            onChange={(e) => set({ zipCode: e.target.value })}
+            onBlur={(e) => onCepBlur(e.target.value)}
+            inputMode="numeric"
+            autoComplete="postal-code"
+            placeholder="00000-000"
+            required
+          />
+        </Labeled>
+        <Labeled label="Número">
+          <input
+            className="input"
+            value={value.number}
+            onChange={(e) => set({ number: e.target.value })}
+            inputMode="numeric"
+            autoComplete="off"
+            required
+          />
+        </Labeled>
+      </div>
+      <Labeled label="Rua">
+        <input
+          className="input"
+          value={value.street}
+          onChange={(e) => set({ street: e.target.value })}
+          autoComplete="address-line1"
+          required
+        />
+      </Labeled>
+      <div className="grid grid-cols-2 gap-2">
+        <Labeled label="Bairro">
+          <input
+            className="input"
+            value={value.neighborhood}
+            onChange={(e) => set({ neighborhood: e.target.value })}
+            autoComplete="address-level3"
+            required
+          />
+        </Labeled>
+        <Labeled label="Complemento" optional>
+          <input
+            className="input"
+            value={value.complement}
+            onChange={(e) => set({ complement: e.target.value })}
+            autoComplete="address-line2"
+          />
+        </Labeled>
+      </div>
+      <div className="grid grid-cols-[1fr_5rem] gap-2">
+        <Labeled label="Cidade">
+          <input
+            className="input"
+            value={value.city}
+            onChange={(e) => set({ city: e.target.value })}
+            autoComplete="address-level2"
+            required
+          />
+        </Labeled>
+        <Labeled label="UF">
+          <input
+            className="input uppercase"
+            value={value.state}
+            onChange={(e) => set({ state: e.target.value.toUpperCase().slice(0, 2) })}
+            maxLength={2}
+            autoComplete="address-level1"
             required
           />
         </Labeled>
