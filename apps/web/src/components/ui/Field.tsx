@@ -8,6 +8,7 @@ export function Field({
   error,
   success,
   required,
+  optional,
   className,
   children,
 }: {
@@ -18,6 +19,8 @@ export function Field({
   success?: string;
   /** Adds a red asterisk after the label. */
   required?: boolean;
+  /** Adds a muted "(opcional)" after the label. */
+  optional?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -48,6 +51,7 @@ export function Field({
             *
           </span>
         )}
+        {optional && <span className="ml-1 font-normal text-faint">(opcional)</span>}
       </span>
       {control}
       {hint && !error && !success && (
