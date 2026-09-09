@@ -50,23 +50,23 @@ export async function reconcilePendingDonations(): Promise<{ checked: number; up
 
     if (!snap) {
       // Gateway has no record — treat as failed so it stops being counted as open.
-      await markChargeStatus(chargeId, "FAILED");
+      await markChargeStatus(chargeId, "FAILED", d.organizationId);
       updated++;
       continue;
     }
 
     if (snap.status === "paid") {
-      const r = await markChargePaid(chargeId, snap.gatewayFeeCents ?? 0);
+      const r = await markChargePaid(chargeId, snap.gatewayFeeCents ?? 0, d.organizationId);
       if (r === "applied") updated++;
     } else if (["failed", "canceled"].includes(snap.status)) {
-      await markChargeStatus(chargeId, "FAILED");
+      await markChargeStatus(chargeId, "FAILED", d.organizationId);
       updated++;
     } else {
       // still pending upstream — expire it locally if the QR/boleto is past due
       const pd = (d.paymentDetails ?? {}) as { expiresAt?: string; dueAt?: string };
       const due = pd.expiresAt || pd.dueAt;
       if (due && new Date(due).getTime() < now) {
-        await markChargeStatus(chargeId, "EXPIRED");
+        await markChargeStatus(chargeId, "EXPIRED", d.organizationId);
         updated++;
       }
     }

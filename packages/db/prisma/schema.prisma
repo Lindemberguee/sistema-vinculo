@@ -1356,6 +1356,10 @@ model GatewayEvent {
   id          String    @id // event id from Pagar.me
   type        String
   payload     Json
+  // The org whose webhook secret authenticated this delivery. Nullable for rows
+  // written before this column existed and for the legacy platform webhook.
+  // The worker refuses to mutate a donation/plan that belongs to another org.
+  organizationId String?
   processedAt DateTime?
   error       String?
   attempts    Int       @default(0)

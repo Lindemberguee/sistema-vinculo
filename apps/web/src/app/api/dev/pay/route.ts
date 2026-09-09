@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
   const donation = await prisma.donation.findFirst({
     where: donationId ? { id: donationId } : { gatewayChargeId: chargeId },
-    select: { id: true, gatewayChargeId: true, status: true },
+    select: { id: true, gatewayChargeId: true, status: true, organizationId: true },
   });
   if (!donation) return NextResponse.json({ error: "donation_not_found" }, { status: 404 });
   if (!donation.gatewayChargeId) {
@@ -46,6 +46,7 @@ export async function POST(req: Request) {
     id: `evt_mock_${type}_${donation.gatewayChargeId}`,
     type,
     payload: { id: donation.gatewayChargeId, status } as object,
+    organizationId: donation.organizationId,
   };
 
   const created = await prisma.gatewayEvent.createMany({ data: [event], skipDuplicates: true });
