@@ -1,22 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Check, ShieldCheck } from "lucide-react";
 import { tokenizeCard } from "./pagarme-browser";
+import { resolveAccent } from "./accent";
 import {
   brl,
   Labeled,
+  FormSection,
+  SegmentedControl,
+  AmountGrid,
+  MethodChips,
+  CheckoutSubmit,
+  ResultPanel,
+  RecapRow,
+  AwaitingPix,
   CardFields,
   BillingAddressFields,
   emptyCard,
   useBillingAddress,
+  useScrollToError,
   buildCardData,
   billingAddressBody,
-  checkoutBox,
-  MethodChips,
-  AwaitingPix,
+  checkoutCard,
 } from "./checkout-ui";
-
-const METHOD_LABELS = { PIX: "Pix", CREDIT_CARD: "Cartão", BOLETO: "Boleto" };
 
 type Method = "PIX" | "CREDIT_CARD" | "BOLETO";
 type Phase =
@@ -28,6 +35,9 @@ type Phase =
   | "paid"
   | "subscribed"
   | "failed";
+
+const METHOD_LABEL: Record<Method, string> = { PIX: "Pix", CREDIT_CARD: "Cartão", BOLETO: "Boleto" };
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Map a raw acquirer/gateway reason to something a donor can act on. */
 function friendlyDecline(reason?: string): string {
@@ -92,18 +102,17 @@ const REF_RE = /^[a-z0-9]{3,16}$/;
 
 export function DonationCheckout(props: DonationCheckoutProps) {
   const accent = props.accentColor ?? "#006B4F";
+  const pal = resolveAccent(accent);
   const isSponsorship = Boolean(props.sponseeId);
+
   const [amountCents, setAmountCents] = useState(
     props.suggestedAmountsCents[1] ?? props.suggestedAmountsCents[0] ?? 5000,
   );
-  const [customAmount, setCustomAmount] = useState("");
-  // Sponsorship is card or Pix only (no boleto), always monthly.
   const methods = isSponsorship ? props.methods.filter((m) => m !== "BOLETO") : props.methods;
   const [method, setMethod] = useState<Method>(methods[0] ?? "PIX");
   const [recurring, setRecurring] = useState(isSponsorship);
   const [coverFee, setCoverFee] = useState(props.allowTip);
   const [suggested, setSuggested] = useState(props.suggestedAmountsCents);
-  // Set once a visitor arriving through /l/{slug} is resolved.
   const [linkPreset, setLinkPreset] = useState<LinkPreset | null>(null);
   const lockedAmount = Boolean(linkPreset?.lockAmount && linkPreset.amountCents);
 
@@ -118,29 +127,26 @@ export function DonationCheckout(props: DonationCheckoutProps) {
         if (cancelled || !p) return;
         setLinkPreset(p);
         if (p.suggestedAmountsCents?.length) setSuggested(p.suggestedAmountsCents);
-        if (p.amountCents && p.amountCents > 0) {
-          setAmountCents(p.amountCents);
-          setCustomAmount("");
-        }
+        if (p.amountCents && p.amountCents > 0) setAmountCents(p.amountCents);
         if (p.defaultRecurring && props.allowRecurring) setRecurring(true);
         if (p.defaultCoverFee && props.allowTip) setCoverFee(true);
       })
-      .catch(() => {
-        /* a dead link just behaves like a normal visit */
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   const [installments, setInstallments] = useState(1);
   const rewards = props.rewards ?? [];
   const [rewardId, setRewardId] = useState<string | null>(null);
   const selectedReward = rewards.find((r) => r.id === rewardId) ?? null;
+  const [topUp, setTopUp] = useState(false);
 
   function pickReward(r: (typeof rewards)[number] | null) {
     setRewardId(r?.id ?? null);
-    setCustomAmount("");
+    setTopUp(false);
     if (r) {
       setAmountCents(r.amountCents);
       setRecurring(false);
@@ -158,25 +164,26 @@ export function DonationCheckout(props: DonationCheckoutProps) {
   const { billing, setBilling, cepLoading, onCepBlur } = useBillingAddress();
 
   const [phase, setPhase] = useState<Phase>("form");
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [errs, setErrs] = useState<Record<string, string>>({});
   const [payment, setPayment] = useState<Record<string, unknown> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { formRef, scrollToError } = useScrollToError();
 
+  const monthly = recurring || isSponsorship;
+  const needsPhone = method === "CREDIT_CARD" || method === "BOLETO";
   const tipCents = useMemo(
     () => (coverFee ? Math.ceil((amountCents * props.platformFeeBps) / 10_000) : 0),
     [coverFee, amountCents, props.platformFeeBps],
   );
   const totalCents = amountCents + tipCents;
+  const clearErr = (k: string) => setErrs((e) => (e[k] ? { ...e, [k]: "" } : e));
 
-  function pickAmount(value: number) {
-    setAmountCents(value);
-    setCustomAmount("");
-  }
-  function onCustomAmount(raw: string) {
-    setCustomAmount(raw);
-    const cents = Math.round(Number(raw.replace(/[^\d,.-]/g, "").replace(",", ".")) * 100);
-    if (Number.isFinite(cents) && cents > 0) setAmountCents(cents);
-  }
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   function startPolling(donationId: string) {
     pollRef.current = setInterval(async () => {
@@ -190,7 +197,7 @@ export function DonationCheckout(props: DonationCheckoutProps) {
         } else if (["FAILED", "EXPIRED", "CHARGED_BACK"].includes(s.status)) {
           clearInterval(pollRef.current!);
           setPhase("failed");
-          setError("O pagamento não foi concluído.");
+          setFormError("O pagamento não foi concluído. Tente novamente.");
         }
       } catch {
         /* keep polling */
@@ -198,23 +205,31 @@ export function DonationCheckout(props: DonationCheckoutProps) {
     }, 4000);
   }
 
+  function validate(): boolean {
+    const next: Record<string, string> = {};
+    if (amountCents < props.minAmountCents)
+      next.amount = `Valor mínimo: ${brl(props.minAmountCents)}`;
+    if (donor.name.trim().length < 2) next.name = "Informe seu nome.";
+    if (!EMAIL_RE.test(donor.email.trim())) next.email = "E-mail inválido.";
+    if (needsPhone && donor.phone.replace(/\D/g, "").length < 10)
+      next.phone = "Telefone com DDD é obrigatório.";
+    if (method === "BOLETO" && donor.document.replace(/\D/g, "").length < 11)
+      next.document = "CPF/CNPJ é obrigatório para boleto.";
+    if (dedicate && !dedication.to.trim()) next.dedicateTo = "Informe a homenagem.";
+    setErrs(next);
+    return Object.keys(next).length === 0;
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setFormError(null);
 
     if (props.preview) {
-      setError("Pré-visualização: as doações só funcionam na página publicada.");
+      setFormError("Pré-visualização: as doações só funcionam na página publicada.");
       return;
     }
-
-    if (amountCents < props.minAmountCents) {
-      setError(`Valor mínimo: ${brl(props.minAmountCents)}`);
-      return;
-    }
-
-    const needsPhone = method === "CREDIT_CARD" || method === "BOLETO";
-    if (needsPhone && donor.phone.replace(/\D/g, "").length < 10) {
-      setError("Informe um telefone com DDD.");
+    if (!validate()) {
+      requestAnimationFrame(scrollToError);
       return;
     }
 
@@ -222,7 +237,8 @@ export function DonationCheckout(props: DonationCheckoutProps) {
     if (method === "CREDIT_CARD") {
       const built = buildCardData(card, billing, donor.document);
       if ("error" in built) {
-        setError(built.error);
+        setErrs((x) => ({ ...x, card: built.error }));
+        requestAnimationFrame(scrollToError);
         return;
       }
       setPhase("submitting");
@@ -230,13 +246,12 @@ export function DonationCheckout(props: DonationCheckoutProps) {
         cardToken = await tokenizeCard(props.pagarmePublicKey, built.data);
       } catch (err) {
         setPhase("failed");
-        setError(err instanceof Error ? err.message : "Não foi possível validar o cartão.");
+        setFormError(err instanceof Error ? err.message : "Não foi possível validar o cartão.");
         return;
       }
     }
 
     setPhase("submitting");
-
     try {
       const res = await fetch("/api/public/donations", {
         method: "POST",
@@ -246,7 +261,7 @@ export function DonationCheckout(props: DonationCheckoutProps) {
           amountCents,
           tipCents,
           method,
-          recurring: recurring || isSponsorship,
+          recurring: monthly,
           sponseeId: props.sponseeId,
           rewardId: rewardId ?? undefined,
           donationLinkId: linkPreset?.id,
@@ -285,7 +300,7 @@ export function DonationCheckout(props: DonationCheckoutProps) {
 
       if (!res.ok || !body.id) {
         setPhase("failed");
-        setError(
+        setFormError(
           method === "CREDIT_CARD"
             ? friendlyDecline(body.message ?? body.error)
             : body.message ?? body.error ?? "Não foi possível processar a doação.",
@@ -294,14 +309,11 @@ export function DonationCheckout(props: DonationCheckoutProps) {
       }
 
       setPayment(body.payment ?? null);
-
-      if (body.subscription) {
-        setPhase("subscribed");
-      } else if (body.status === "PAID") {
-        setPhase("paid");
-      } else if (body.status === "FAILED") {
+      if (body.subscription) setPhase("subscribed");
+      else if (body.status === "PAID") setPhase("paid");
+      else if (body.status === "FAILED") {
         setPhase("failed");
-        setError(friendlyDecline(body.message));
+        setFormError(friendlyDecline(body.message));
       } else if (method === "PIX") {
         setPhase("awaiting_pix");
         startPolling(body.id);
@@ -309,93 +321,106 @@ export function DonationCheckout(props: DonationCheckoutProps) {
         setPhase("awaiting_boleto");
         startPolling(body.id);
       } else {
-        // CREDIT_CARD came back PENDING (3-D Secure / async auth) — confirmed by webhook.
         setPhase("awaiting_card");
         startPolling(body.id);
       }
     } catch (err) {
       setPhase("failed");
-      setError(err instanceof Error ? err.message : "Erro inesperado.");
+      setFormError(err instanceof Error ? err.message : "Erro inesperado.");
     }
   }
 
-  if (phase === "paid") {
-    return (
-      <div id="checkout" className={checkoutBox}>
-        <h3 className="text-base font-semibold">Doação confirmada! 💚</h3>
-        <p className="mt-1 text-sm">
-          Obrigado, {donor.name || "doador"}. Enviamos o recibo para {donor.email}.
-        </p>
-      </div>
-    );
-  }
+  // ── Result / waiting screens ───────────────────────────────────
 
-  if (phase === "subscribed") {
+  if (phase === "paid" || phase === "subscribed") {
+    const sub = phase === "subscribed";
     return (
-      <div id="checkout" className={checkoutBox}>
-        <h3 className="text-base font-semibold">Assinatura criada! 💚</h3>
-        <p className="mt-1 text-sm">
-          Obrigado, {donor.name || "doador"}. Sua doação mensal de {brl(totalCents)} foi ativada — a confirmação do
-          primeiro pagamento chega em {donor.email}.
+      <ResultPanel
+        title={sub ? "Doação mensal ativada" : "Doação confirmada"}
+        footer={
+          <a href="#top" className="link">
+            Voltar à campanha
+          </a>
+        }
+      >
+        <p>
+          Obrigado{donor.name ? `, ${donor.name.split(" ")[0]}` : ""}! Enviamos o recibo para{" "}
+          <span className="font-medium text-ink">{donor.email}</span>.
         </p>
-      </div>
+        <dl className="mt-3 border-t border-line pt-3">
+          <RecapRow label={sub ? "Valor mensal" : "Valor"} value={brl(totalCents)} />
+          <RecapRow label="Forma de pagamento" value={METHOD_LABEL[method]} />
+          {sub && <RecapRow label="Cobrança" value="Todo mês, até você cancelar" />}
+        </dl>
+      </ResultPanel>
     );
   }
 
   if (phase === "awaiting_pix") {
-    const qr = payment as { qrCode?: string; qrCodeUrl?: string } | null;
+    const qr = payment as { qrCode?: string; qrCodeUrl?: string; expiresAt?: string } | null;
     return (
-      <AwaitingPix heading={`Pague ${brl(totalCents)} com Pix`} qrCodeUrl={qr?.qrCodeUrl} qrCode={qr?.qrCode} />
+      <AwaitingPix
+        heading="Escaneie para pagar com Pix"
+        amountLabel={brl(totalCents)}
+        qrCodeUrl={qr?.qrCodeUrl}
+        qrCode={qr?.qrCode}
+        expiresAt={qr?.expiresAt}
+      />
     );
   }
 
   if (phase === "awaiting_boleto") {
     const bol = payment as { line?: string; pdfUrl?: string } | null;
     return (
-      <div id="checkout" className={checkoutBox}>
-        <h3 className="text-base font-semibold">Boleto gerado — {brl(totalCents)}</h3>
-        {bol?.line && <code className="mt-2 block break-all text-xs">{bol.line}</code>}
-        {bol?.pdfUrl && (
-          <p className="mt-2">
-            <a href={bol.pdfUrl} target="_blank" rel="noreferrer" className="link text-sm">
-              Abrir boleto em PDF
-            </a>
-          </p>
+      <div id="checkout" className={checkoutCard}>
+        <h3 className="text-base font-semibold">Boleto gerado</h3>
+        <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums">{brl(totalCents)}</p>
+        {bol?.line && (
+          <code className="mt-3 block break-all rounded-md bg-canvas p-2 text-xs text-muted">
+            {bol.line}
+          </code>
         )}
-        <p className="mt-2 text-sm text-muted">A confirmação pode levar até 2 dias úteis.</p>
+        {bol?.pdfUrl && (
+          <a
+            href={bol.pdfUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex min-h-11 items-center justify-center rounded-full border border-line-strong px-4 text-sm font-medium hover:bg-canvas"
+          >
+            Abrir boleto em PDF
+          </a>
+        )}
+        <p className="mt-3 text-sm text-muted">
+          Enviamos o boleto por e-mail. A confirmação pode levar até 2 dias úteis.
+        </p>
       </div>
     );
   }
 
   if (phase === "awaiting_card") {
     return (
-      <div id="checkout" className={checkoutBox}>
-        <h3 className="text-base font-semibold">Confirmando o pagamento…</h3>
-        <p className="mt-1 text-sm text-muted">
-          Seu cartão está sendo autorizado. Isso costuma levar alguns segundos — não feche esta página.
+      <ResultPanel tone="pending" title="Confirmando o pagamento…">
+        <p>
+          Seu cartão está sendo autorizado — costuma levar alguns segundos. Não feche esta página.
         </p>
-        <p className="mt-3 flex items-center gap-2 text-sm text-muted">
-          <span className="size-1.5 animate-pulse rounded-full bg-brand-500" />
-          Aguardando confirmação…
-        </p>
-      </div>
+      </ResultPanel>
     );
   }
 
-  const busy = phase === "submitting";
+  // ── Form ──────────────────────────────────────────────────────
 
-  const chipStyle = (active: boolean) =>
-    active ? { borderColor: accent, color: accent } : { borderColor: "var(--color-line)", color: "var(--color-ink)" };
+  const busy = phase === "submitting";
+  const showAmountPicker = !lockedAmount && !selectedReward;
+  const canChooseFrequency = props.allowRecurring && !isSponsorship && !selectedReward && !lockedAmount;
 
   return (
-    <form id="checkout" onSubmit={onSubmit} className={checkoutBox}>
-      <h3 className="mb-4 text-base font-semibold">
+    <form ref={formRef} id="checkout" onSubmit={onSubmit} className={checkoutCard}>
+      <h3 className="text-lg font-semibold tracking-tight">
         {props.heading ?? (isSponsorship ? "Apadrinhar mensalmente" : "Fazer uma doação")}
       </h3>
 
       {rewards.length > 0 && !isSponsorship && (
-        <fieldset className={fieldset}>
-          <legend className={legend}>Escolha uma cota (opcional)</legend>
+        <FormSection title="Escolha uma cota" aside="opcional">
           <div className="grid gap-2">
             {rewards.map((r) => {
               const soldOut = r.remaining === 0;
@@ -404,14 +429,23 @@ export function DonationCheckout(props: DonationCheckoutProps) {
                 <button
                   key={r.id}
                   type="button"
+                  role="radio"
+                  aria-checked={active}
                   disabled={soldOut}
                   onClick={() => pickReward(r)}
-                  className="rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{ borderColor: active ? accent : "var(--color-line-strong)" }}
+                  className="rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={
+                    active
+                      ? { borderColor: pal.accent, background: pal.wash }
+                      : { borderColor: "var(--color-line-strong)" }
+                  }
                 >
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-sm font-medium">{r.title}</span>
-                    <span className="shrink-0 text-sm font-semibold" style={{ color: accent }}>
+                    <span
+                      className="shrink-0 text-sm font-semibold tabular-nums"
+                      style={{ color: pal.textInk }}
+                    >
                       {brl(r.amountCents)}
                     </span>
                   </div>
@@ -419,7 +453,9 @@ export function DonationCheckout(props: DonationCheckoutProps) {
                   {soldOut ? (
                     <p className="mt-1 text-xs font-medium text-danger">Esgotada</p>
                   ) : (
-                    r.remaining != null && <p className="mt-1 text-xs text-muted">{r.remaining} restantes</p>
+                    r.remaining != null && (
+                      <p className="mt-1 text-xs text-muted">{r.remaining} restantes</p>
+                    )
                   )}
                 </button>
               );
@@ -428,211 +464,374 @@ export function DonationCheckout(props: DonationCheckoutProps) {
               <button
                 type="button"
                 onClick={() => pickReward(null)}
-                className="text-left text-xs font-medium text-brand-600 hover:underline"
+                className="justify-self-start text-xs font-medium hover:underline"
+                style={{ color: pal.textInk }}
               >
                 Doar sem cota
               </button>
             )}
           </div>
-        </fieldset>
+        </FormSection>
       )}
 
-      <fieldset className={fieldset}>
-        <legend className={legend}>{isSponsorship ? "Valor mensal" : "Valor"}</legend>
-        {lockedAmount && !selectedReward ? (
-          <span className="text-lg font-semibold" style={{ color: accent }}>
-            {brl(amountCents)}
-          </span>
-        ) : selectedReward ? (
-          <div className="flex items-center gap-3">
-            <span className="text-lg font-semibold" style={{ color: accent }}>
+      {canChooseFrequency && (
+        <FormSection title="Frequência">
+          <SegmentedControl
+            ariaLabel="Frequência da doação"
+            accent={accent}
+            value={recurring ? "monthly" : "once"}
+            onChange={(v) => setRecurring(v === "monthly")}
+            options={[
+              { value: "once", label: "Única" },
+              { value: "monthly", label: "Mensal" },
+            ]}
+          />
+        </FormSection>
+      )}
+
+      <FormSection title={monthly ? "Valor mensal" : "Valor"}>
+        {showAmountPicker ? (
+          <AmountGrid
+            presets={suggested}
+            valueCents={amountCents}
+            onChange={(c) => {
+              setAmountCents(c);
+              clearErr("amount");
+            }}
+            allowCustom
+            accent={accent}
+            recurring={monthly}
+          />
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-2xl font-semibold tracking-tight tabular-nums" style={{ color: pal.textInk }}>
               {brl(amountCents)}
             </span>
-            <input
-              aria-label="Doar um valor maior"
-              placeholder="Doar mais"
-              value={customAmount}
-              onChange={(e) => onCustomAmount(e.target.value)}
-              inputMode="decimal"
-              className="input w-28"
-            />
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {suggested.map((v) => {
-              const active = amountCents === v && !customAmount;
-              return (
-                <button key={v} type="button" onClick={() => pickAmount(v)} className={chip} style={chipStyle(active)}>
-                  {brl(v)}
-                </button>
-              );
-            })}
-            <input
-              aria-label="Outro valor"
-              placeholder="Outro valor"
-              value={customAmount}
-              onChange={(e) => onCustomAmount(e.target.value)}
-              inputMode="decimal"
-              className="input w-28"
-            />
+            {selectedReward && !topUp && (
+              <button
+                type="button"
+                onClick={() => setTopUp(true)}
+                className="text-xs font-medium hover:underline"
+                style={{ color: pal.textInk }}
+              >
+                Doar um valor maior
+              </button>
+            )}
           </div>
         )}
-        {isSponsorship ? (
-          <p className="mt-2 text-xs text-muted">Cobrança mensal automática. Você pode cancelar quando quiser.</p>
-        ) : (
-          props.allowRecurring &&
-          !selectedReward && (
-            <label className={checkboxRow}>
+        {selectedReward && topUp && (
+          <div className="mt-2">
+            <Labeled label="Valor total da doação">
               <input
-                type="checkbox"
-                className="size-4 accent-brand-600"
-                checked={recurring}
-                onChange={(e) => setRecurring(e.target.checked)}
+                className="input tabular-nums"
+                inputMode="decimal"
+                value={amountCents ? (amountCents / 100).toFixed(2) : ""}
+                onChange={(e) => {
+                  const d = e.target.value.replace(/\D/g, "");
+                  setAmountCents(Math.max(selectedReward.amountCents, d ? parseInt(d, 10) : 0));
+                }}
               />
-              Tornar mensal
-            </label>
-          )
+            </Labeled>
+          </div>
+        )}
+        {errs.amount && (
+          <p className="mt-1.5 text-xs text-danger" role="alert">
+            {errs.amount}
+          </p>
+        )}
+        {isSponsorship && (
+          <p className="mt-2 text-xs text-muted">
+            Cobrança mensal automática. Você pode cancelar quando quiser.
+          </p>
         )}
         {props.allowTip && props.platformFeeBps > 0 && (
-          <label className={checkboxRow}>
-            <input
-              type="checkbox"
-              className="size-4 accent-brand-600"
-              checked={coverFee}
-              onChange={(e) => setCoverFee(e.target.checked)}
-            />
-            {props.tipLabel} (+{brl(tipCents)})
-          </label>
+          <ToggleRow
+            className="mt-3"
+            checked={coverFee}
+            onChange={setCoverFee}
+            accent={accent}
+            title={props.tipLabel}
+            desc={`Some ${brl(Math.ceil((amountCents * props.platformFeeBps) / 10_000))} para cobrir a taxa de processamento — 100% da sua doação chega à organização.`}
+          />
         )}
-      </fieldset>
+      </FormSection>
 
-      <fieldset className={fieldset}>
-        <legend className={legend}>Forma de pagamento</legend>
-        <MethodChips methods={methods} value={method} onChange={setMethod} accent={accent} labels={METHOD_LABELS} />
+      <FormSection title="Forma de pagamento">
+        <MethodChips methods={methods} value={method} onChange={setMethod} accent={accent} />
 
         {method === "CREDIT_CARD" && (
-          <div className="mt-3 grid gap-2.5">
+          <div className="mt-3 grid gap-3">
             <CardFields card={card} onChange={setCard} />
             <Labeled label="Parcelas">
               <select
+                className="input"
                 value={installments}
                 onChange={(e) => setInstallments(Number(e.target.value))}
-                className="input"
               >
                 {[1, 2, 3, 6, 12].map((n) => (
                   <option key={n} value={n}>
-                    {n}x
+                    {n}x {n > 1 ? `de ${brl(Math.ceil(totalCents / n))}` : "à vista"}
                   </option>
                 ))}
               </select>
             </Labeled>
-            <p className="mt-1 text-xs font-medium text-ink">Endereço de cobrança</p>
-            <BillingAddressFields
-              value={billing}
-              onChange={setBilling}
-              onCepBlur={onCepBlur}
-              loading={cepLoading}
-            />
+            <div>
+              <p className="mb-1.5 text-[0.8125rem] font-medium text-ink">Endereço de cobrança</p>
+              <BillingAddressFields
+                value={billing}
+                onChange={setBilling}
+                onCepBlur={onCepBlur}
+                loading={cepLoading}
+              />
+            </div>
+            {errs.card && (
+              <p className="text-xs text-danger" role="alert">
+                {errs.card}
+              </p>
+            )}
           </div>
         )}
-      </fieldset>
+      </FormSection>
 
-      <fieldset className={fieldset}>
-        <legend className={legend}>Seus dados</legend>
+      <FormSection title="Seus dados">
         <div className="grid gap-2.5">
-          <Labeled label="Nome">
-            <input value={donor.name} onChange={(e) => setDonor({ ...donor, name: e.target.value })} required className="input" />
-          </Labeled>
-          <Labeled label="E-mail">
-            <input type="email" value={donor.email} onChange={(e) => setDonor({ ...donor, email: e.target.value })} required className="input" />
-          </Labeled>
-          <Labeled label="CPF/CNPJ" optional={method !== "BOLETO"}>
-            <input
-              value={donor.document}
-              onChange={(e) => setDonor({ ...donor, document: e.target.value })}
-              className="input"
-              inputMode="numeric"
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <Labeled label="Nome" required error={errs.name}>
+              <input
+                className="input"
+                autoComplete="name"
+                value={donor.name}
+                onChange={(e) => {
+                  setDonor({ ...donor, name: e.target.value });
+                  clearErr("name");
+                }}
+              />
+            </Labeled>
+            <Labeled label="E-mail" required error={errs.email}>
+              <input
+                type="email"
+                className="input"
+                autoComplete="email"
+                value={donor.email}
+                onChange={(e) => {
+                  setDonor({ ...donor, email: e.target.value });
+                  clearErr("email");
+                }}
+              />
+            </Labeled>
+          </div>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <Labeled
+              label="CPF/CNPJ"
+              optional={method !== "BOLETO"}
               required={method === "BOLETO"}
-            />
-          </Labeled>
-          <Labeled label="Telefone" optional={method === "PIX"}>
-            <input
-              value={donor.phone}
-              onChange={(e) => setDonor({ ...donor, phone: e.target.value })}
+              error={errs.document}
+            >
+              <input
+                className="input tabular-nums"
+                inputMode="numeric"
+                value={donor.document}
+                onChange={(e) => {
+                  setDonor({ ...donor, document: e.target.value });
+                  clearErr("document");
+                }}
+              />
+            </Labeled>
+            <Labeled
+              label="Telefone"
+              optional={method === "PIX"}
+              required={needsPhone}
+              error={errs.phone}
+            >
+              <input
+                className="input"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="(11) 99999-9999"
+                value={donor.phone}
+                onChange={(e) => {
+                  setDonor({ ...donor, phone: e.target.value });
+                  clearErr("phone");
+                }}
+              />
+            </Labeled>
+          </div>
+          <Labeled label="Mensagem para a organização" optional>
+            <textarea
               className="input"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="(11) 99999-9999"
-              required={method !== "PIX"}
+              rows={2}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
             />
           </Labeled>
-          <Labeled label="Mensagem" optional>
-            <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} className="input" />
-          </Labeled>
+
           {props.dedicationEnabled && !isSponsorship && (
             <>
-              <label className={checkboxRow}>
-                <input
-                  type="checkbox"
-                  className="size-4 accent-brand-600"
-                  checked={dedicate}
-                  onChange={(e) => setDedicate(e.target.checked)}
-                />
-                Dedicar esta doação a alguém
-              </label>
+              <ToggleRow
+                checked={dedicate}
+                onChange={setDedicate}
+                accent={accent}
+                title="Dedicar esta doação a alguém"
+              />
               {dedicate && (
-                <div className="grid gap-2">
-                  <Labeled label="Em homenagem a">
+                <div className="grid gap-2.5 rounded-xl bg-canvas p-3">
+                  <Labeled label="Em homenagem a" required error={errs.dedicateTo}>
                     <input
-                      value={dedication.to}
-                      onChange={(e) => setDedication({ ...dedication, to: e.target.value })}
                       className="input"
                       placeholder="Nome da pessoa homenageada"
+                      value={dedication.to}
+                      onChange={(e) => {
+                        setDedication({ ...dedication, to: e.target.value });
+                        clearErr("dedicateTo");
+                      }}
                     />
                   </Labeled>
                   <Labeled label="Recado" optional>
                     <textarea
+                      className="input"
+                      rows={2}
                       value={dedication.message}
                       onChange={(e) => setDedication({ ...dedication, message: e.target.value })}
-                      rows={2}
-                      className="input"
                     />
                   </Labeled>
                 </div>
               )}
             </>
           )}
-          <label className={checkboxRow}>
-            <input type="checkbox" className="size-4 accent-brand-600" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
-            Doar anonimamente
-          </label>
-          <label className={checkboxRow}>
-            <input type="checkbox" className="size-4 accent-brand-600" checked={consentEmail} onChange={(e) => setConsentEmail(e.target.checked)} />
-            Aceito receber e-mails da organização
-          </label>
-          <label className={checkboxRow}>
-            <input type="checkbox" className="size-4 accent-brand-600" checked={consentWhatsapp} onChange={(e) => setConsentWhatsapp(e.target.checked)} />
-            Aceito receber mensagens no WhatsApp
-          </label>
+
+          <div className="mt-1 grid gap-2">
+            <CheckRow checked={anonymous} onChange={setAnonymous} accent={accent}>
+              Doar anonimamente
+            </CheckRow>
+            <CheckRow checked={consentEmail} onChange={setConsentEmail} accent={accent}>
+              Aceito receber e-mails da organização
+            </CheckRow>
+            <CheckRow checked={consentWhatsapp} onChange={setConsentWhatsapp} accent={accent}>
+              Aceito receber mensagens no WhatsApp
+            </CheckRow>
+          </div>
         </div>
-      </fieldset>
+      </FormSection>
 
-        {error && <p className="field-error mb-2" role="alert">{error}</p>}
+      <dl className="mt-5 border-t border-line pt-4">
+        <RecapRow label={monthly ? "Doação mensal" : "Doação"} value={brl(amountCents)} />
+        {tipCents > 0 && <RecapRow label="Taxa coberta" value={brl(tipCents)} />}
+        <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-line pt-2 text-base font-semibold">
+          <dt>Total{monthly ? " / mês" : ""}</dt>
+          <dd className="tabular-nums" style={{ color: pal.textInk }}>
+            {brl(totalCents)}
+          </dd>
+        </div>
+      </dl>
 
-      <button type="submit" disabled={busy || props.preview} className={submit} style={{ background: accent }}>
-        {props.preview ? "Pré-visualização — doações desativadas" : busy ? "Processando…" : `Doar ${brl(totalCents)}`}
-      </button>
-      <p className="mt-2 text-xs text-muted">
-        {props.preview
-          ? "Publique a campanha para receber doações por esta página."
-          : "Pagamento processado com segurança. Dados do cartão não passam pelos nossos servidores."}
-      </p>
+      {formError && (
+        <p className="mt-3 rounded-md bg-danger-bg px-3 py-2 text-sm text-danger" role="alert">
+          {formError}
+        </p>
+      )}
+
+      <CheckoutSubmit
+        accent={accent}
+        busy={busy}
+        disabled={props.preview}
+        label={props.preview ? "Pré-visualização — desativado" : `Doar ${brl(totalCents)}`}
+        totalLabel={brl(totalCents)}
+        footnote={
+          props.preview ? (
+            "Publique a campanha para receber doações por esta página."
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="size-3.5" aria-hidden />
+              Pagamento seguro · dados do cartão não passam pelos nossos servidores
+            </span>
+          )
+        }
+      />
+      {/* space so the mobile sticky bar never covers the footnote */}
+      <div className="h-16 sm:hidden" aria-hidden />
     </form>
   );
 }
 
-const fieldset = "mb-5 border-0 p-0";
-const legend = "mb-2 text-sm font-semibold";
-const chip = "rounded-full border px-3 py-2 text-sm transition-colors";
-const checkboxRow = "mt-2 flex items-center gap-2 text-sm";
-const submit = "mt-1 w-full rounded-full py-3 text-[15px] font-medium text-white disabled:opacity-50";
+// ── local rows ──────────────────────────────────────────────────
+
+function CheckRow({
+  checked,
+  onChange,
+  accent,
+  children,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  accent: string;
+  children: ReactNode;
+}) {
+  const pal = resolveAccent(accent);
+  return (
+    <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+      <span
+        className="grid size-5 shrink-0 place-items-center rounded-[0.3rem] border transition-colors"
+        style={
+          checked
+            ? { background: pal.accent, borderColor: pal.accent, color: pal.onAccent }
+            : { borderColor: "var(--color-line-strong)" }
+        }
+      >
+        {checked && <Check className="size-3.5" aria-hidden />}
+      </span>
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span>{children}</span>
+    </label>
+  );
+}
+
+function ToggleRow({
+  checked,
+  onChange,
+  accent,
+  title,
+  desc,
+  className,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  accent: string;
+  title: string;
+  desc?: string;
+  className?: string;
+}) {
+  const pal = resolveAccent(accent);
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${className ?? ""}`}
+      style={
+        checked
+          ? { borderColor: pal.accent, background: pal.wash }
+          : { borderColor: "var(--color-line-strong)" }
+      }
+    >
+      <span
+        className="mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors"
+        style={{ background: checked ? pal.accent : "var(--color-line-strong)" }}
+      >
+        <span
+          className="size-4 rounded-full bg-white transition-transform"
+          style={{ transform: checked ? "translateX(1rem)" : "translateX(0)" }}
+        />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-ink">{title}</span>
+        {desc && <span className="mt-0.5 block text-xs text-muted">{desc}</span>}
+      </span>
+    </button>
+  );
+}

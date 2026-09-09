@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ShieldCheck } from "lucide-react";
 import { cn } from "@/components/ui";
 import { resolveAccent } from "@/blocks/accent";
 
@@ -24,8 +25,8 @@ export function PublicShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
-      <header className="border-b border-line bg-surface">
-        <div className={cn("mx-auto flex items-center gap-2.5 px-6 py-3.5", max)}>
+      <header className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur">
+        <div className={cn("mx-auto flex items-center gap-2.5 px-5 py-3 sm:px-6", max)}>
           {org.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={org.logoUrl} alt={org.displayName} className="h-7 w-auto object-contain" />
@@ -41,10 +42,13 @@ export function PublicShell({
         </div>
       </header>
 
-      <main className={cn("mx-auto w-full flex-1 px-6 py-10", max)}>{children}</main>
+      <main className={cn("mx-auto w-full flex-1 px-5 py-8 sm:px-6 sm:py-12", max)}>{children}</main>
 
-      <footer className="border-t border-line py-6 text-center text-xs text-faint">
-        Pagamento processado com segurança · Feito com a plataforma de doações
+      <footer className="border-t border-line bg-surface py-5 text-center text-xs text-faint">
+        <span className="inline-flex items-center gap-1.5">
+          <ShieldCheck className="size-3.5" aria-hidden />
+          Pagamento processado com segurança
+        </span>
       </footer>
     </div>
   );
