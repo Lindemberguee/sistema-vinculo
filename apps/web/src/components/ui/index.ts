@@ -7,6 +7,8 @@ export { FormSection, FormActions } from "./FormSection";
 export { PasswordInput } from "./PasswordInput";
 export { MoneyInput } from "./MoneyInput";
 export { Stepper } from "./Stepper";
+export { useConfirm } from "./AlertDialog";
+export { CopyField } from "./CopyField";
 export { Badge, StatusBadge } from "./Badge";
 export { PageHeader, EmptyState, Skeleton, Stat, Alert, Sparkline, DeltaBadge } from "./Page";
 export { Table, Th, Td, Tr } from "./Table";

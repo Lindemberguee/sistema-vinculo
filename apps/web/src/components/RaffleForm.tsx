@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { Check } from "lucide-react";
 import { createRaffleFormAction, updateRaffleFormAction, type RaffleResult } from "@/server/raffle/actions";
 import { Field, Input, Textarea, Select, Button } from "@/components/ui";
 
@@ -50,20 +51,30 @@ export function RaffleForm({
 
   return (
     <form action={formAction} className="grid max-w-xl gap-4">
-      <Field label="Título" error={err("title")}>
+      {locked && (
+        <p className="rounded-md bg-warn-bg px-3 py-2 text-xs text-warn">
+          A rifa já teve vendas — total de números e preço só podem aumentar.
+        </p>
+      )}
+      <Field label="Título" required error={err("title")}>
         <Input name="title" defaultValue={v.title} required />
       </Field>
-      <Field label="Descrição" error={err("description")}>
+      <Field label="Descrição" required error={err("description")}>
         <Textarea name="description" defaultValue={v.description} rows={3} required />
       </Field>
-      <Field label="Prêmio" error={err("prize")}>
+      <Field label="Prêmio" required error={err("prize")}>
         <Input name="prize" defaultValue={v.prize} required />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Preço por número (R$)" error={err("priceReais")}>
+        <Field label="Preço por número (R$)" required error={err("priceReais")}>
           <Input name="priceReais" defaultValue={v.priceReais} inputMode="decimal" required />
         </Field>
-        <Field label="Total de números" error={err("totalNumbers")} hint={locked ? "Só pode aumentar após vendas" : undefined}>
+        <Field
+          label="Total de números"
+          required
+          error={err("totalNumbers")}
+          hint={locked ? "Só pode aumentar após vendas" : undefined}
+        >
           <Input name="totalNumbers" defaultValue={v.totalNumbers} inputMode="numeric" required />
         </Field>
         <Field label="Mínimo por compra" error={err("minPerPurchase")}>
@@ -87,13 +98,22 @@ export function RaffleForm({
         </Select>
       </Field>
 
-      {state?.error && <p className="field-error">{state.error}</p>}
-      {state?.ok && <p className="text-sm text-success">Salvo.</p>}
+      {state?.error && (
+        <p className="field-error" role="alert">
+          {state.error}
+        </p>
+      )}
 
-      <div>
-        <Button type="submit" disabled={pending}>
+      <div className="flex items-center gap-3">
+        <Button type="submit" loading={pending}>
           {pending ? "Salvando…" : raffleId ? "Salvar alterações" : "Criar rifa"}
         </Button>
+        {state?.ok && (
+          <span className="inline-flex items-center gap-1.5 text-sm text-success" role="status" aria-live="polite">
+            <Check className="size-4" aria-hidden />
+            Salvo
+          </span>
+        )}
       </div>
     </form>
   );

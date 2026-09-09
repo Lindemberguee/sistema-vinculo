@@ -64,12 +64,20 @@ export function EventForm({
           ))}
         </Select>
       </Field>
-      {state?.error && <p className="field-error">{state.error}</p>}
-      {state?.ok && <p className="text-sm text-success">Salvo.</p>}
-      <div>
-        <Button type="submit" disabled={pending}>
+      {state?.error && (
+        <p className="field-error" role="alert">
+          {state.error}
+        </p>
+      )}
+      <div className="flex items-center gap-3">
+        <Button type="submit" loading={pending}>
           {pending ? "Salvando…" : eventId ? "Salvar alterações" : "Criar evento"}
         </Button>
+        {state?.ok && (
+          <span className="text-sm text-success" role="status" aria-live="polite">
+            Salvo
+          </span>
+        )}
       </div>
     </form>
   );
