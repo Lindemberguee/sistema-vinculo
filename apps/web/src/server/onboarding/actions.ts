@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma, prisma } from "@donation/db";
-import { isAppError } from "@donation/shared";
+import { isAppError, TRIAL_PERIOD_DAYS } from "@donation/shared";
 import { requireOrgAccess, requireUser } from "@/server/auth-helpers";
 import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES, headObject } from "@/server/storage";
 
@@ -33,7 +33,7 @@ const orgBasicsSchema = z.object({
   addressZip: z.string().transform(digits).pipe(z.string().length(8)),
 });
 
-/** Step 1 → creates the org (PENDING_KYC), OWNER membership, free subscription, KYC draft. */
+/** Step 1 → creates the org (PENDING_KYC), OWNER membership, trial subscription, KYC draft. */
 export async function createDraftOrganization(formData: FormData): Promise<OnboardingResult> {
   const user = await requireUser();
   const account = await prisma.user.findUnique({ where: { id: user.id }, select: { emailVerified: true } });
@@ -65,8 +65,8 @@ export async function createDraftOrganization(formData: FormData): Promise<Onboa
         data: {
           organizationId: created.id,
           planId: "free",
-          status: "ACTIVE",
-          currentPeriodEnd: new Date(Date.now() + 365 * 24 * 3600 * 1000),
+          status: "TRIALING",
+          currentPeriodEnd: new Date(Date.now() + TRIAL_PERIOD_DAYS * 24 * 3600 * 1000),
         },
       });
 

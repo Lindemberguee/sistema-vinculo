@@ -5,6 +5,13 @@ export * from "./rfm";
 // node:dns and this barrel is imported by client components and the edge
 // middleware. Import it directly: `@donation/shared/ssrf`.
 
+/**
+ * Free trial length for a new organization. The subscription starts as
+ * `TRIALING` with `currentPeriodEnd = createdAt + this`; the billing sweep
+ * turns it `PAST_DUE` after it lapses, then suspends after the grace period.
+ */
+export const TRIAL_PERIOD_DAYS = 30;
+
 /** Roles a user can hold within an organization (highest to lowest privilege). */
 export const ORG_ROLES = ["OWNER", "ADMIN", "FINANCE", "EDITOR", "VIEWER"] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@donation/db";
+import { prisma, getOrgLimits, planHasModule } from "@donation/db";
 import { isAppError } from "@donation/shared";
 import { getIntlGateway, isIntlConfigured } from "@donation/payments";
 import { resolveTenant } from "@/server/tenant";
@@ -46,6 +46,11 @@ export async function POST(req: Request) {
       select: { id: true, displayName: true, status: true },
     });
     if (!org || org.status !== "ACTIVE") return NextResponse.json({ error: "org_not_ready" }, { status: 403 });
+
+    // International donation is a plan module, not just a platform env flag.
+    if (!planHasModule(await getOrgLimits(org.id), "intl")) {
+      return NextResponse.json({ error: "intl_not_in_plan" }, { status: 403 });
+    }
 
     const campaign = await prisma.campaign.findUnique({
       where: { organizationId_slug: { organizationId: org.id, slug: input.campaignSlug } },

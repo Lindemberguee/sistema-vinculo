@@ -24,7 +24,8 @@ export interface PlanLimits {
   modules: string[]; // ["*"] = every module
 }
 
-const FREE_DEFAULTS: PlanLimits = {
+/** Fallback used when a `Plan.limits` blob is missing keys — the most restrictive tier. */
+const DEFAULT_LIMITS: PlanLimits = {
   maxCampaigns: 1,
   maxUsers: 2,
   customDomain: false,
@@ -35,12 +36,12 @@ const FREE_DEFAULTS: PlanLimits = {
 const numOrNull = (v: unknown): number | null =>
   v === null || v === undefined ? null : Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null;
 
-/** Coerce a `Plan.limits` JSON blob into a safe shape (missing keys → free tier). */
+/** Coerce a `Plan.limits` JSON blob into a safe shape (missing keys → most restrictive). */
 export function parsePlanLimits(raw: unknown): PlanLimits {
   const o = (raw ?? {}) as Record<string, unknown>;
   return {
-    maxCampaigns: "maxCampaigns" in o ? numOrNull(o.maxCampaigns) : FREE_DEFAULTS.maxCampaigns,
-    maxUsers: "maxUsers" in o ? numOrNull(o.maxUsers) : FREE_DEFAULTS.maxUsers,
+    maxCampaigns: "maxCampaigns" in o ? numOrNull(o.maxCampaigns) : DEFAULT_LIMITS.maxCampaigns,
+    maxUsers: "maxUsers" in o ? numOrNull(o.maxUsers) : DEFAULT_LIMITS.maxUsers,
     customDomain: Boolean(o.customDomain),
     removeBranding: Boolean(o.removeBranding),
     modules: Array.isArray(o.modules) ? o.modules.filter((m): m is string => typeof m === "string") : [],
