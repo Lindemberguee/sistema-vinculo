@@ -163,7 +163,7 @@ export function DonationCheckout(props: DonationCheckoutProps) {
   const [consentEmail, setConsentEmail] = useState(true);
   const [consentWhatsapp, setConsentWhatsapp] = useState(false);
   const [card, setCard] = useState(emptyCard);
-  const { billing, setBilling, cepLoading, onCepBlur } = useBillingAddress();
+  const { billing, setBilling, cepLoading, cepStatus, onCepBlur } = useBillingAddress();
 
   const [phase, setPhase] = useState<Phase>("form");
   const [formError, setFormError] = useState<string | null>(null);
@@ -174,6 +174,9 @@ export function DonationCheckout(props: DonationCheckoutProps) {
 
   const monthly = recurring || isSponsorship;
   const needsPhone = method === "CREDIT_CARD" || method === "BOLETO";
+  // Card path: the donor's CPF is the card-holder document (no field on the card
+  // itself) and feeds the acquirer's anti-fraud customer object.
+  const needsDocument = method === "CREDIT_CARD" || method === "BOLETO";
   const tipCents = useMemo(
     () => (coverFee ? Math.ceil((amountCents * props.platformFeeBps) / 10_000) : 0),
     [coverFee, amountCents, props.platformFeeBps],
@@ -215,8 +218,8 @@ export function DonationCheckout(props: DonationCheckoutProps) {
     if (!EMAIL_RE.test(donor.email.trim())) next.email = "E-mail inválido.";
     if (needsPhone && donor.phone.replace(/\D/g, "").length < 10)
       next.phone = "Telefone com DDD é obrigatório.";
-    if (method === "BOLETO" && donor.document.replace(/\D/g, "").length < 11)
-      next.document = "CPF/CNPJ é obrigatório para boleto.";
+    if (needsDocument && donor.document.replace(/\D/g, "").length < 11)
+      next.document = method === "BOLETO" ? "CPF/CNPJ é obrigatório para boleto." : "CPF do titular do cartão é obrigatório.";
     if (dedicate && !dedication.to.trim()) next.dedicateTo = "Informe a homenagem.";
     setErrs(next);
     return Object.keys(next).length === 0;
@@ -584,6 +587,7 @@ export function DonationCheckout(props: DonationCheckoutProps) {
                 onChange={setBilling}
                 onCepBlur={onCepBlur}
                 loading={cepLoading}
+                cepStatus={cepStatus}
               />
             </div>
             {errs.card && (
@@ -625,8 +629,8 @@ export function DonationCheckout(props: DonationCheckoutProps) {
           <div className="grid gap-2.5 sm:grid-cols-2">
             <Labeled
               label="CPF/CNPJ"
-              optional={method !== "BOLETO"}
-              required={method === "BOLETO"}
+              optional={!needsDocument}
+              required={needsDocument}
               error={errs.document}
             >
               <input

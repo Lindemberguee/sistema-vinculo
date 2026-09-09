@@ -56,7 +56,7 @@ export function RaffleWidget(props: RaffleWidgetProps) {
   const [donor, setDonor] = useState({ name: "", email: "", document: "", phone: "" });
   const [consentEmail, setConsentEmail] = useState(true);
   const [card, setCard] = useState(emptyCard);
-  const { billing, setBilling, cepLoading, onCepBlur } = useBillingAddress();
+  const { billing, setBilling, cepLoading, cepStatus, onCepBlur } = useBillingAddress();
 
   const [phase, setPhase] = useState<Phase>("form");
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +109,10 @@ export function RaffleWidget(props: RaffleWidgetProps) {
     }
     if (method === "CREDIT_CARD" && donor.phone.replace(/\D/g, "").length < 10) {
       setError("Informe um telefone com DDD.");
+      return;
+    }
+    if (method === "CREDIT_CARD" && donor.document.replace(/\D/g, "").length < 11) {
+      setError("Informe o CPF do titular do cartão.");
       return;
     }
 
@@ -304,7 +308,7 @@ export function RaffleWidget(props: RaffleWidgetProps) {
             <CardFields card={card} onChange={setCard} />
             <div>
               <p className="mb-1.5 text-[0.8125rem] font-medium text-ink">Endereço de cobrança</p>
-              <BillingAddressFields value={billing} onChange={setBilling} onCepBlur={onCepBlur} loading={cepLoading} />
+              <BillingAddressFields value={billing} onChange={setBilling} onCepBlur={onCepBlur} loading={cepLoading} cepStatus={cepStatus} />
             </div>
           </div>
         )}
@@ -321,7 +325,7 @@ export function RaffleWidget(props: RaffleWidgetProps) {
             </Labeled>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-2">
-            <Labeled label="CPF/CNPJ" optional>
+            <Labeled label="CPF/CNPJ" optional={method !== "CREDIT_CARD"} required={method === "CREDIT_CARD"}>
               <input className="input tabular-nums" inputMode="numeric" value={donor.document} onChange={(e) => setDonor({ ...donor, document: e.target.value })} />
             </Labeled>
             <Labeled label="Telefone" optional={method === "PIX"} required={method !== "PIX"}>

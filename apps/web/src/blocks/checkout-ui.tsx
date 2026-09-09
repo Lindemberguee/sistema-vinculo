@@ -619,9 +619,8 @@ export function AwaitingPix({
 export interface CardState {
   number: string;
   holderName: string;
-  holderDocument: string;
-  expMonth: string;
-  expYear: string;
+  /** "MM/AA" — split into month/year in buildCardData. */
+  expiry: string;
   cvv: string;
 }
 
@@ -648,9 +647,7 @@ export const emptyBillingAddress: BillingAddressState = {
 export const emptyCard: CardState = {
   number: "",
   holderName: "",
-  holderDocument: "",
-  expMonth: "",
-  expYear: "",
+  expiry: "",
   cvv: "",
 };
 
@@ -658,13 +655,15 @@ export const emptyCard: CardState = {
 export function useBillingAddress() {
   const [billing, setBilling] = useState<BillingAddressState>(emptyBillingAddress);
   const [cepLoading, setCepLoading] = useState(false);
+  /** null = not tried yet, "ok" = auto-filled, "fail" = not found / offline. */
+  const [cepStatus, setCepStatus] = useState<"ok" | "fail" | null>(null);
 
   const onCepBlur = useCallback(async (rawCep: string) => {
     if (rawCep.replace(/\D/g, "").length !== 8) return;
     setCepLoading(true);
     try {
       const found = await lookupCep(rawCep);
-      if (found) {
+      if (found && (found.city || found.state)) {
         setBilling((b) => ({
           ...b,
           street: found.street || b.street,
@@ -672,13 +671,18 @@ export function useBillingAddress() {
           city: found.city || b.city,
           state: found.state || b.state,
         }));
+        setCepStatus("ok");
+      } else {
+        setCepStatus("fail");
       }
+    } catch {
+      setCepStatus("fail");
     } finally {
       setCepLoading(false);
     }
   }, []);
 
-  return { billing, setBilling, cepLoading, onCepBlur };
+  return { billing, setBilling, cepLoading, cepStatus, onCepBlur };
 }
 
 /**
@@ -690,14 +694,16 @@ export function useBillingAddress() {
 export function buildCardData(
   card: CardState,
   billing: BillingAddressState,
+  /** The donor's CPF/CNPJ — used as the card holder document (no separate field). */
   fallbackDocument?: string,
 ): { error: string } | { data: CardData } {
+  const [mm = "", yy = ""] = card.expiry.split("/");
   const data: CardData = {
     number: card.number,
     holderName: card.holderName,
-    holderDocument: card.holderDocument || fallbackDocument || undefined,
-    expMonth: Number(card.expMonth),
-    expYear: Number(card.expYear),
+    holderDocument: fallbackDocument || undefined,
+    expMonth: Number(mm),
+    expYear: Number(yy),
     cvv: card.cvv,
     billingAddress: {
       line1: [billing.number, billing.street, billing.neighborhood].filter(Boolean).join(", "),
@@ -722,10 +728,17 @@ export function billingAddressBody(billing: BillingAddressState) {
   };
 }
 
-const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-const YEARS = Array.from({ length: 13 }, (_, i) => String(new Date().getFullYear() + i));
+/** "1225" / "12/25" → "12/25"; keeps a lone leading digit as-is while typing. */
+function formatExpiry(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 4);
+  return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+}
 
-/** Credit-card inputs. Tokenized in the browser — never posted to our API. */
+/**
+ * Credit-card inputs — number, name, validade (MM/AA) and CVV. Tokenized in the
+ * browser, never posted to our API. The card-holder document is the donor's own
+ * CPF (asked once in the contact section), so there's no field for it here.
+ */
 export function CardFields({
   card,
   onChange,
@@ -747,56 +760,25 @@ export function CardFields({
           maxLength={23}
         />
       </Labeled>
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <Labeled label="Nome impresso no cartão" required>
-          <input
-            className="input"
-            value={card.holderName}
-            onChange={(e) => set({ holderName: e.target.value })}
-            autoComplete="cc-name"
-          />
-        </Labeled>
-        <Labeled label="CPF do titular" required>
+      <Labeled label="Nome impresso no cartão" required>
+        <input
+          className="input"
+          value={card.holderName}
+          onChange={(e) => set({ holderName: e.target.value })}
+          autoComplete="cc-name"
+        />
+      </Labeled>
+      <div className="grid grid-cols-[1fr_6rem] gap-2">
+        <Labeled label="Validade" required>
           <input
             className="input tabular-nums"
-            value={card.holderDocument}
-            onChange={(e) => set({ holderDocument: e.target.value })}
+            value={card.expiry}
+            onChange={(e) => set({ expiry: formatExpiry(e.target.value) })}
             inputMode="numeric"
-            autoComplete="off"
-            placeholder="000.000.000-00"
+            autoComplete="cc-exp"
+            placeholder="MM/AA"
+            maxLength={5}
           />
-        </Labeled>
-      </div>
-      <div className="grid grid-cols-[1fr_1fr_5rem] gap-2">
-        <Labeled label="Mês" required>
-          <select
-            className="input"
-            value={card.expMonth}
-            onChange={(e) => set({ expMonth: e.target.value })}
-            autoComplete="cc-exp-month"
-          >
-            <option value="">MM</option>
-            {MONTHS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </Labeled>
-        <Labeled label="Ano" required>
-          <select
-            className="input"
-            value={card.expYear}
-            onChange={(e) => set({ expYear: e.target.value })}
-            autoComplete="cc-exp-year"
-          >
-            <option value="">AAAA</option>
-            {YEARS.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
         </Labeled>
         <Labeled label="CVV" required>
           <input
@@ -814,21 +796,34 @@ export function CardFields({
 }
 
 /**
- * Billing address for card / boleto. CEP auto-fills street/neighborhood/city/UF
- * (all stay editable); the acquirer requires this for card charges.
+ * Billing address for card / boleto — the acquirer's anti-fraud needs it.
+ * The donor only types CEP + número; CEP auto-fills street/bairro/city/UF and
+ * those stay collapsed. If the lookup fails (or the donor wants to fix it) the
+ * full address opens for manual entry.
  */
 export function BillingAddressFields({
   value,
   onChange,
   onCepBlur,
   loading,
+  cepStatus,
 }: {
   value: BillingAddressState;
   onChange: (next: BillingAddressState) => void;
   onCepBlur: (cep: string) => void;
   loading?: boolean;
+  cepStatus?: "ok" | "fail" | null;
 }) {
   const set = (patch: Partial<BillingAddressState>) => onChange({ ...value, ...patch });
+  const [expanded, setExpanded] = useState(false);
+
+  const zip8 = value.zipCode.replace(/\D/g, "").length === 8;
+  const addressMissing = !value.city || !value.state.trim() || !value.street.trim();
+  // Open automatically once a CEP is in but we still don't have a usable address.
+  const forceOpen = zip8 && !loading && addressMissing;
+  const showFull = expanded || forceOpen;
+  const resolved = cepStatus === "ok" && !addressMissing;
+
   return (
     <div className="grid gap-2.5">
       <div className="grid grid-cols-[8rem_1fr] gap-2">
@@ -854,51 +849,84 @@ export function BillingAddressFields({
           />
         </Labeled>
       </div>
-      <Labeled label="Rua" required>
-        <input
-          className="input"
-          value={value.street}
-          onChange={(e) => set({ street: e.target.value })}
-          autoComplete="address-line1"
-        />
-      </Labeled>
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <Labeled label="Bairro" required>
-          <input
-            className="input"
-            value={value.neighborhood}
-            onChange={(e) => set({ neighborhood: e.target.value })}
-            autoComplete="address-level3"
-          />
-        </Labeled>
-        <Labeled label="Complemento" optional>
-          <input
-            className="input"
-            value={value.complement}
-            onChange={(e) => set({ complement: e.target.value })}
-            autoComplete="address-line2"
-          />
-        </Labeled>
-      </div>
-      <div className="grid grid-cols-[1fr_4.5rem] gap-2">
-        <Labeled label="Cidade" required>
-          <input
-            className="input"
-            value={value.city}
-            onChange={(e) => set({ city: e.target.value })}
-            autoComplete="address-level2"
-          />
-        </Labeled>
-        <Labeled label="UF" required>
-          <input
-            className="input uppercase"
-            value={value.state}
-            onChange={(e) => set({ state: e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2) })}
-            maxLength={2}
-            autoComplete="address-level1"
-          />
-        </Labeled>
-      </div>
+
+      {!showFull && resolved && (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
+          <span className="truncate">
+            {[value.street, value.neighborhood].filter(Boolean).join(", ")} · {value.city}/{value.state}
+          </span>
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="font-medium text-brand-700 underline underline-offset-2 hover:no-underline"
+          >
+            editar
+          </button>
+        </p>
+      )}
+
+      {cepStatus === "fail" && !expanded && (
+        <p className="text-xs text-muted">
+          Não achamos esse CEP.{" "}
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="font-medium text-brand-700 underline underline-offset-2 hover:no-underline"
+          >
+            Informar o endereço manualmente
+          </button>
+        </p>
+      )}
+
+      {showFull && (
+        <div className="grid gap-2.5">
+          <Labeled label="Rua" required>
+            <input
+              className="input"
+              value={value.street}
+              onChange={(e) => set({ street: e.target.value })}
+              autoComplete="address-line1"
+            />
+          </Labeled>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <Labeled label="Bairro" required>
+              <input
+                className="input"
+                value={value.neighborhood}
+                onChange={(e) => set({ neighborhood: e.target.value })}
+                autoComplete="address-level3"
+              />
+            </Labeled>
+            <Labeled label="Complemento" optional>
+              <input
+                className="input"
+                value={value.complement}
+                onChange={(e) => set({ complement: e.target.value })}
+                autoComplete="address-line2"
+              />
+            </Labeled>
+          </div>
+          <div className="grid grid-cols-[1fr_4.5rem] gap-2">
+            <Labeled label="Cidade" required>
+              <input
+                className="input"
+                value={value.city}
+                onChange={(e) => set({ city: e.target.value })}
+                autoComplete="address-level2"
+              />
+            </Labeled>
+            <Labeled label="UF" required>
+              <input
+                className="input uppercase"
+                value={value.state}
+                onChange={(e) => set({ state: e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2) })}
+                maxLength={2}
+                autoComplete="address-level1"
+              />
+            </Labeled>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
