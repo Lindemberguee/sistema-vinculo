@@ -56,9 +56,13 @@ export function EmailSenderCard({
           >
             <Input name="replyTo" type="email" defaultValue={replyTo ?? ""} placeholder={fallbackReplyTo ?? ""} />
           </Field>
-          {state?.error && <p className="field-error sm:col-span-2">{state.error}</p>}
+          {state?.error && (
+            <p className="field-error sm:col-span-2" role="alert">
+              {state.error}
+            </p>
+          )}
           <div className="sm:col-span-2">
-            <Button type="submit" size="sm" disabled={pending}>
+            <Button type="submit" size="sm" loading={pending}>
               {pending ? "Salvando…" : "Salvar"}
             </Button>
           </div>

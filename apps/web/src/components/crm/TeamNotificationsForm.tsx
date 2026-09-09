@@ -56,9 +56,13 @@ export function TeamNotificationsForm({
         </Select>
       </Field>
 
-      {state?.error && <p className="field-error">{state.error}</p>}
+      {state?.error && (
+        <p className="field-error" role="alert">
+          {state.error}
+        </p>
+      )}
       <div>
-        <Button type="submit" size="sm" disabled={pending}>
+        <Button type="submit" size="sm" loading={pending}>
           {pending ? "Salvando…" : "Salvar"}
         </Button>
       </div>
