@@ -99,23 +99,39 @@ export function Canvas({
 
 function EmptyState({ dispatch }: { dispatch: Dispatch<StudioAction> }) {
   return (
-    <div className="px-8 py-14 text-center" onClick={(e) => e.stopPropagation()}>
-      <h2 className="text-lg font-semibold">Comece sua página</h2>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-        Escolha um modelo para partir de algo pronto, ou clique / arraste blocos da esquerda.
-      </p>
-      <div className="mx-auto mt-6 grid max-w-md gap-2.5">
+    <div className="px-4 py-10 sm:px-8 sm:py-12" onClick={(e) => e.stopPropagation()}>
+      <div className="text-center">
+        <h2 className="text-lg font-semibold tracking-tight">Comece por um modelo</h2>
+        <p className="mx-auto mt-1 max-w-md text-sm text-muted">
+          Cada modelo já vem com blocos e textos de exemplo. Ajuste tudo depois — ou monte do zero
+          arrastando blocos da esquerda.
+        </p>
+      </div>
+      <div className="mx-auto mt-7 grid max-w-2xl gap-2.5 @lg:grid-cols-2">
         {STARTERS.map((s) => (
           <button
             key={s.key}
             type="button"
             onClick={() =>
-              dispatch({ type: "reset", blocks: s.blocks.map((t) => newBlock(t) as EditorBlock), keepHistory: true })
+              dispatch({
+                type: "reset",
+                blocks: s.blocks.map((b) => {
+                  const base = newBlock(b.type) as EditorBlock;
+                  return b.props ? { ...base, props: { ...base.props, ...b.props } } : base;
+                }),
+                keepHistory: true,
+              })
             }
-            className="rounded-xl border border-line bg-surface px-4 py-3 text-left transition-colors hover:border-line-strong hover:bg-canvas"
+            className="group flex flex-col rounded-xl border border-line bg-surface p-4 text-left transition-colors hover:border-brand-400 hover:bg-brand-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
           >
-            <div className="text-sm font-medium">{s.label}</div>
-            <div className="mt-0.5 text-xs text-muted">{s.hint}</div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">{s.label}</span>
+              <span className="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-[0.6875rem] font-medium text-muted group-hover:bg-surface">
+                {s.blocks.length} blocos
+              </span>
+            </div>
+            <span className="mt-1 text-xs leading-relaxed text-muted">{s.goal}</span>
+            <span className="mt-2 text-[0.6875rem] leading-relaxed text-faint">{s.hint}</span>
           </button>
         ))}
       </div>
