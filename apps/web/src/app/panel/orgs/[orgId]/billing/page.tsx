@@ -18,10 +18,12 @@ const MODULE_LABEL: Record<string, string> = {
 
 const SUB_LABEL: Record<string, { label: string; tone: "success" | "warn" | "danger" | "neutral" }> = {
   ACTIVE: { label: "Ativa", tone: "success" },
-  TRIALING: { label: "Em avaliação", tone: "neutral" },
+  TRIALING: { label: "Teste grátis", tone: "warn" },
   PAST_DUE: { label: "Vencida", tone: "danger" },
   CANCELED: { label: "Cancelada", tone: "neutral" },
 };
+
+const daysUntil = (d: Date) => Math.max(0, Math.ceil((d.getTime() - Date.now()) / 86_400_000));
 
 const dt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" });
 
@@ -74,9 +76,11 @@ export default async function BillingPage({ params }: { params: Promise<{ orgId:
 
             {sub && (
               <p className="text-sm text-muted">
-                {sub.status === "PAST_DUE"
-                  ? `Mensalidade vencida há ${overdueDays} dia${overdueDays === 1 ? "" : "s"} (venceu em ${dt.format(sub.currentPeriodEnd)}). Regularize com nossa equipe para não suspender a organização.`
-                  : `Próximo vencimento: ${dt.format(sub.currentPeriodEnd)}.`}
+                {sub.status === "TRIALING"
+                  ? `Teste grátis — termina em ${daysUntil(sub.currentPeriodEnd)} dia${daysUntil(sub.currentPeriodEnd) === 1 ? "" : "s"} (${dt.format(sub.currentPeriodEnd)}). Depois, mensalidade${org.plan?.monthlyCents ? ` de ${formatBRL(org.plan.monthlyCents)}` : ""} combinada com a equipe para não interromper.`
+                  : sub.status === "PAST_DUE"
+                    ? `Mensalidade vencida há ${overdueDays} dia${overdueDays === 1 ? "" : "s"} (venceu em ${dt.format(sub.currentPeriodEnd)}). Regularize com nossa equipe para não suspender a organização.`
+                    : `Próximo vencimento: ${dt.format(sub.currentPeriodEnd)}.`}
                 {sub.lastPaidAt ? ` Último pagamento registrado em ${dt.format(sub.lastPaidAt)}.` : ""}
               </p>
             )}

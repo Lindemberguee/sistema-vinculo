@@ -7,7 +7,7 @@ import { Prisma, withOrgContext } from "@donation/db";
 import { PageBlocks, PageBlocksDraft, BLOCK_REGISTRY, type BlockType } from "@donation/blocks";
 import { isAppError } from "@donation/shared";
 import { requireOrgAccess } from "@/server/auth-helpers";
-import { assertCampaignQuota } from "@/server/billing/limits";
+import { assertCampaignQuota, assertModule } from "@/server/billing/limits";
 import { emitOutboundEvent } from "@/server/webhooks/emit";
 import { enqueueCampaignUpdate } from "@/server/queue";
 import { sanitizeRichText } from "@/blocks/sanitize";
@@ -483,6 +483,7 @@ export async function saveCampaignSettingsExtra(
     const { db } = await requireOrgAccess(orgId, "EDITOR");
     const parsed = settingsExtraSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return { ok: false, fieldErrors: parsed.error.flatten().fieldErrors };
+    if (parsed.data.allowAmbassadors) await assertModule(orgId, "ambassadors");
     await loadCampaignOr404(db, campaignId);
 
     const notifyEmails = (parsed.data.notifyEmails ?? "")

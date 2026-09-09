@@ -18,6 +18,9 @@ export async function processGatewayEvent(gatewayEventId: string): Promise<void>
   if (event.processedAt) return; // already done
 
   const data = event.payload as Record<string, any>;
+  // The org whose webhook secret authenticated this delivery. Every mutation
+  // below refuses to touch a donation/plan that belongs to a different org.
+  const orgId = event.organizationId;
 
   try {
     switch (event.type) {
@@ -25,39 +28,40 @@ export async function processGatewayEvent(gatewayEventId: string): Promise<void>
       case "charge.paid": {
         const chargeId = chargeIdOf(data);
         if (!chargeId) throw new Error("paid event without charge id");
-        await markChargePaid(chargeId, gatewayFeeOf(data));
+        await markChargePaid(chargeId, gatewayFeeOf(data), orgId);
         break;
       }
       case "charge.payment_failed": {
         const subId = subscriptionIdOf(data);
         if (subId) {
-          await handleSubscriptionFailure(subId);
+          await handleSubscriptionFailure(subId, orgId);
         } else {
           const chargeId = chargeIdOf(data);
-          if (chargeId) await markChargeStatus(chargeId, "FAILED");
+          if (chargeId) await markChargeStatus(chargeId, "FAILED", orgId);
         }
         break;
       }
       case "charge.refunded": {
         const chargeId = chargeIdOf(data);
-        if (chargeId) await reverseCharge(chargeId, "REFUNDED");
+        if (chargeId) await reverseCharge(chargeId, "REFUNDED", orgId);
         break;
       }
       case "charge.chargedback": {
         const chargeId = chargeIdOf(data);
-        if (chargeId) await reverseCharge(chargeId, "CHARGED_BACK");
+        if (chargeId) await reverseCharge(chargeId, "CHARGED_BACK", orgId);
         break;
       }
       case "subscription.charged":
       case "invoice.paid": {
         const subId = subscriptionIdOf(data);
         const chargeId = chargeIdOf(data);
-        if (subId && chargeId) await recordSubscriptionCharge({ subscriptionId: subId, chargeId, gatewayFeeCents: gatewayFeeOf(data) });
+        if (subId && chargeId)
+          await recordSubscriptionCharge({ subscriptionId: subId, chargeId, gatewayFeeCents: gatewayFeeOf(data), expectedOrgId: orgId });
         break;
       }
       case "subscription.canceled": {
         const subId = subscriptionIdOf(data);
-        if (subId) await markSubscriptionCanceled(subId);
+        if (subId) await markSubscriptionCanceled(subId, orgId);
         break;
       }
       default:

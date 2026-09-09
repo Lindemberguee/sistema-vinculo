@@ -8,10 +8,12 @@ import { Check } from "lucide-react";
 import { registerUser, type AuthActionResult } from "@/server/auth/actions";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Field, Input, PasswordInput, Button } from "@/components/ui";
+import { safeInternalPath } from "@/lib/safe-redirect";
 
 function RegisterForm() {
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") ?? "/onboarding";
+  // Manual navigation after signIn(redirect: false) — sanitise to block open redirects.
+  const callbackUrl = safeInternalPath(params.get("callbackUrl"), "/onboarding");
   const [state, action, pending] = useActionState<AuthActionResult | null, FormData>(registerUser, null);
   const [signingIn, setSigningIn] = useState(false);
   const err = (k: string) => state?.fieldErrors?.[k]?.[0];

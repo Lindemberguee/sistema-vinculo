@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Prisma } from "@donation/db";
 import { isAppError } from "@donation/shared";
 import { requireOrgAccess } from "@/server/auth-helpers";
+import { assertModule } from "@/server/billing/limits";
 import { randomLinkSlug } from "./slug";
 import type { ActionResult } from "@/server/campaigns/actions";
 
@@ -86,6 +87,7 @@ export async function createDonationLink(
 ): Promise<ActionResult> {
   try {
     const { db, userId } = await requireOrgAccess(orgId, "EDITOR");
+    await assertModule(orgId, "links");
     const parsed = linkSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return { ok: false, fieldErrors: parsed.error.flatten().fieldErrors };
 

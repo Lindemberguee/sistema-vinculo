@@ -97,6 +97,11 @@ const workflow = [
 
 const faqs = [
   {
+    question: "Existe plano gratuito?",
+    answer:
+      "Não há um plano permanentemente gratuito, mas toda organização começa com 30 dias grátis para testar a plataforma por completo. Depois, a mensalidade é combinada diretamente com a equipe (Pix ou boleto) e nunca há cobrança retroativa.",
+  },
+  {
     question: "A plataforma fica com uma parte das doações?",
     answer:
       "Não. No modelo conectado, a plataforma cobra uma licença mensal e não retém comissão sobre as doações. As tarifas do Pagar.me continuam sendo tratadas diretamente pelo gateway da organização.",
@@ -124,14 +129,14 @@ const pricingPlans = [
     price: "R$ 99",
     volume: "até R$ 5 mil/mês",
     description: "Para começar a organizar sua captação.",
-    features: ["1 campanha ativa", "Checkout Pix e cartão", "CRM básico de doadores", "Até 2 usuários"],
+    features: ["1 campanha ativa", "Checkout Pix, cartão e boleto", "Recibos automáticos por e-mail", "Até 2 usuários"],
   },
   {
     name: "Essencial",
     price: "R$ 249",
     volume: "até R$ 20 mil/mês",
     description: "Para equipes que já captam com consistência.",
-    features: ["Campanhas ampliadas", "Doações recorrentes", "CRM completo e segmentação", "Até 5 usuários"],
+    features: ["Campanhas ilimitadas", "CRM de doadores e segmentação", "Sem a marca da plataforma", "Até 5 usuários"],
     featured: true,
   },
   {
@@ -139,14 +144,19 @@ const pricingPlans = [
     price: "R$ 549",
     volume: "até R$ 60 mil/mês",
     description: "Para transformar dados em relacionamento.",
-    features: ["Automações de comunicação", "Eventos, rifas e embaixadores", "Relatórios avançados", "Até 10 usuários"],
+    features: [
+      "Tudo do Essencial",
+      "Rifas, eventos, leilões e apadrinhamento",
+      "Links, embaixadores e doação internacional",
+      "Domínio próprio · até 10 usuários",
+    ],
   },
   {
     name: "Profissional",
     price: "R$ 999",
     volume: "até R$ 150 mil/mês",
     description: "Para operações estruturadas e multidisciplinares.",
-    features: ["Todos os módulos aprovados", "Integrações padrão", "Suporte prioritário", "Revisão trimestral da operação"],
+    features: ["Tudo do Crescimento", "Até 25 usuários", "Suporte prioritário", "Revisão trimestral da operação"],
   },
 ];
 
@@ -333,6 +343,7 @@ export default function MarketingHome() {
               </LinkButton>
             </div>
             <div className="home-reveal home-reveal--5 mt-9 flex flex-wrap gap-x-5 gap-y-2.5 text-xs text-white/55">
+              <span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-[#8fe1bf]" /> 30 dias grátis</span>
               <span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-[#8fe1bf]" /> Sem comissão da plataforma</span>
               <span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-[#8fe1bf]" /> Pix, cartão e recorrência</span>
               <span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-[#8fe1bf]" /> Controle dos seus dados</span>
@@ -386,7 +397,7 @@ export default function MarketingHome() {
               <h2 className="mt-3 text-3xl leading-tight tracking-[-0.04em] sm:text-4xl">Comece simples. Evolua no seu ritmo.</h2>
               <p className="mt-4 max-w-md text-base leading-7 text-muted">A plataforma acompanha a maturidade da sua captação sem colocar burocracia no caminho.</p>
               <Link href="/onboarding" className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-brand-700 underline decoration-brand-300 underline-offset-4 hover:text-brand-800">
-                Criar uma conta gratuita <ArrowRight className="size-4" aria-hidden="true" />
+                Testar 30 dias grátis <ArrowRight className="size-4" aria-hidden="true" />
               </Link>
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
@@ -448,11 +459,12 @@ export default function MarketingHome() {
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-3">
                 <p className="eyebrow text-brand-600">Para cada fase da sua organização</p>
+                <span className="inline-flex items-center rounded-full border border-brand-600/30 bg-brand-50 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.1em] text-brand-700">30 dias grátis</span>
                 <span className="inline-flex items-center rounded-full border border-[#dfc98f] bg-[#fffaf0] px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.1em] text-[#785c20]">Valores iniciais em validação</span>
               </div>
               <h2 className="mt-3 text-3xl leading-tight tracking-[-0.04em] sm:text-4xl">Uma licença que acompanha seu crescimento.</h2>
             </div>
-            <p className="max-w-sm text-sm leading-6 text-muted md:text-right">Mensalidade previsível, sem comissão da plataforma sobre doações. As tarifas do Pagar.me são cobradas diretamente pelo gateway.</p>
+            <p className="max-w-sm text-sm leading-6 text-muted md:text-right">Comece com 30 dias grátis. Depois, mensalidade previsível e sem comissão da plataforma sobre doações — as tarifas do Pagar.me são cobradas diretamente pelo gateway.</p>
           </div>
 
           <div className="mt-10 grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -499,7 +511,7 @@ export default function MarketingHome() {
       <section className="px-5 pb-20 sm:px-8 md:pb-28 lg:px-10">
         <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[1.75rem] bg-[#0b382d] px-6 py-12 text-center text-white sm:px-10 sm:py-16">
           <div className="home-grid absolute inset-0 opacity-35" aria-hidden="true" />
-          <div className="relative mx-auto max-w-2xl"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[#8fe1bf]">O próximo passo cabe na sua agenda</p><h2 className="mt-4 text-3xl leading-tight tracking-[-0.04em] sm:text-4xl">Sua causa já tem uma história. Vamos ajudar mais pessoas a fazer parte dela?</h2><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-white/65 sm:text-base">Crie sua organização, monte a primeira campanha e veja a plataforma trabalhando com você.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><LinkButton href="/onboarding" className="min-h-12 bg-[#8fe1bf] px-5 font-semibold text-[#073b2d] hover:bg-[#b8f4d9]">Começar gratuitamente <ArrowRight className="size-4" aria-hidden="true" /></LinkButton><LinkButton href="/login" variant="ghost" className="min-h-12 border border-white/15 px-5 text-white hover:bg-white/10 hover:text-white">Já tenho uma conta</LinkButton></div></div>
+          <div className="relative mx-auto max-w-2xl"><p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[#8fe1bf]">O próximo passo cabe na sua agenda</p><h2 className="mt-4 text-3xl leading-tight tracking-[-0.04em] sm:text-4xl">Sua causa já tem uma história. Vamos ajudar mais pessoas a fazer parte dela?</h2><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-white/65 sm:text-base">Crie sua organização, monte a primeira campanha e veja a plataforma trabalhando com você.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><LinkButton href="/onboarding" className="min-h-12 bg-[#8fe1bf] px-5 font-semibold text-[#073b2d] hover:bg-[#b8f4d9]">Começar teste grátis <ArrowRight className="size-4" aria-hidden="true" /></LinkButton><LinkButton href="/login" variant="ghost" className="min-h-12 border border-white/15 px-5 text-white hover:bg-white/10 hover:text-white">Já tenho uma conta</LinkButton></div></div>
         </div>
       </section>
 

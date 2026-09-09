@@ -73,7 +73,6 @@ export default async function EmailTemplatesPage({ params }: { params: Promise<{
                           ) : (
                             <Badge tone="neutral">Padrão</Badge>
                           )}
-                          {!r.wired && <Badge tone="warn">Em breve</Badge>}
                         </div>
                         <p className="mt-0.5 text-xs text-muted">{r.meta.description}</p>
                       </div>

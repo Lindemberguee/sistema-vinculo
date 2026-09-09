@@ -1,6 +1,16 @@
 export * from "./money";
 export * from "./errors";
 export * from "./rfm";
+// NOTE: ./ssrf is intentionally NOT re-exported here — it pulls in node:net /
+// node:dns and this barrel is imported by client components and the edge
+// middleware. Import it directly: `@donation/shared/ssrf`.
+
+/**
+ * Free trial length for a new organization. The subscription starts as
+ * `TRIALING` with `currentPeriodEnd = createdAt + this`; the billing sweep
+ * turns it `PAST_DUE` after it lapses, then suspends after the grace period.
+ */
+export const TRIAL_PERIOD_DAYS = 30;
 
 /** Roles a user can hold within an organization (highest to lowest privilege). */
 export const ORG_ROLES = ["OWNER", "ADMIN", "FINANCE", "EDITOR", "VIEWER"] as const;

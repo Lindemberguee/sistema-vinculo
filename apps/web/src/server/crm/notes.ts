@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { isAppError } from "@donation/shared";
 import { requireOrgAccess } from "@/server/auth-helpers";
+import { assertModule } from "@/server/billing/limits";
 
 export interface CrmResult {
   ok: boolean;
@@ -31,6 +32,7 @@ export async function addDonorNote(
 ): Promise<CrmResult> {
   try {
     const { db, userId } = await requireOrgAccess(organizationId, "EDITOR");
+    await assertModule(organizationId, "crm");
     await ensureDonor(db, donorId);
 
     const parsed = noteSchema.safeParse(Object.fromEntries(formData));

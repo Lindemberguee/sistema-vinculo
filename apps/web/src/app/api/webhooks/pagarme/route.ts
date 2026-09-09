@@ -73,7 +73,9 @@ export async function POST(req: Request) {
 
   try {
     const created = await prisma.gatewayEvent.createMany({
-      data: [{ id: event.id, type: event.type, payload: event.data as object }],
+      // `orgId` here was resolved from the payload and its secret verified the
+      // delivery, so it's safe to bind the event to it.
+      data: [{ id: event.id, type: event.type, payload: event.data as object, organizationId: orgId }],
       skipDuplicates: true,
     });
 

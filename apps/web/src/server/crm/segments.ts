@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { isAppError } from "@donation/shared";
 import { requireOrgAccess } from "@/server/auth-helpers";
+import { assertModule } from "@/server/billing/limits";
 import type { CrmResult } from "./notes";
 
 /** Query-param keys allowed to be persisted in a saved segment. */
@@ -18,6 +19,7 @@ export async function saveDonorSegment(
 ): Promise<CrmResult> {
   try {
     const { db, userId } = await requireOrgAccess(organizationId, "EDITOR");
+    await assertModule(organizationId, "crm");
     const parsedName = nameSchema.parse(name);
 
     const filters: Record<string, string> = {};

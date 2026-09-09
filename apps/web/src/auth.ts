@@ -79,9 +79,16 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   );
 }
 
+// Cap how long a stale JWT can carry outdated memberships/verification on the
+// display surfaces (org switcher, sidebar). Org-scoped *authorization* is
+// re-checked against the DB per request in `requireOrgAccess`, so this is
+// defence-in-depth, not the primary guard.
+const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const MEMBERSHIP_TTL_MS = 15 * 60 * 1000; // re-read from DB at most every 15 min
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
   secret: env.NEXTAUTH_SECRET,
   trustHost: true,
   pages: { signIn: "/login" },
@@ -89,15 +96,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     jwt: async ({ token, user, trigger }) => {
       if (user?.id) token.uid = user.id;
-      // Refresh memberships + verification state on sign-in and on session update.
-      if ((user?.id || trigger === "update") && token.uid) {
+      const lastSync = (token.membershipsSyncedAt as number | undefined) ?? 0;
+      const stale = Date.now() - lastSync > MEMBERSHIP_TTL_MS;
+      // Refresh on sign-in, on explicit session update, or when the cached copy
+      // has aged out.
+      if ((user?.id || trigger === "update" || stale) && token.uid) {
         const uid = token.uid as string;
         const [memberships, row] = await Promise.all([
           loadMemberships(uid),
-          prisma.user.findUnique({ where: { id: uid }, select: { emailVerified: true } }),
+          prisma.user.findUnique({
+            where: { id: uid },
+            select: { emailVerified: true, name: true, email: true, image: true },
+          }),
         ]);
         token.memberships = memberships;
         token.verified = Boolean(row?.emailVerified);
+        // Keep the display identity fresh too, so "Minha conta" edits show up
+        // without a re-login.
+        if (row) {
+          token.name = row.name;
+          token.email = row.email;
+          token.picture = row.image;
+        }
+        token.membershipsSyncedAt = Date.now();
       }
       return token;
     },
@@ -105,6 +126,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = (token.uid as string) ?? "";
       session.user.verified = Boolean(token.verified);
       session.user.memberships = (token.memberships as SessionMembership[] | undefined) ?? [];
+      if (token.name !== undefined) session.user.name = token.name;
+      if (token.email) session.user.email = token.email;
+      if (token.picture !== undefined) session.user.image = token.picture as string | null | undefined;
       return session;
     },
   },

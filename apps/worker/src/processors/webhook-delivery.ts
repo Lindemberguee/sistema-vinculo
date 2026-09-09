@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { prisma } from "@donation/db";
+import { assertSafeOutboundUrl, UnsafeUrlError } from "@donation/shared/ssrf";
 
 const TIMEOUT_MS = 10_000;
 const MAX_ATTEMPTS = 6;
@@ -14,6 +15,21 @@ export async function deliverWebhook(deliveryId: string): Promise<void> {
   if (!delivery.webhook.active) {
     await prisma.webhookDelivery.update({ where: { id: deliveryId }, data: { status: "FAILED", lastError: "webhook disabled" } });
     return;
+  }
+
+  // Re-check at send time: the URL passed validation at creation, but DNS could
+  // have been re-pointed at a private address since. Fail terminally (no retry).
+  try {
+    await assertSafeOutboundUrl(delivery.webhook.url);
+  } catch (err) {
+    if (err instanceof UnsafeUrlError) {
+      await prisma.webhookDelivery.update({
+        where: { id: deliveryId },
+        data: { status: "FAILED", lastError: `blocked: ${err.message}` },
+      });
+      return;
+    }
+    throw err;
   }
 
   const body = JSON.stringify({

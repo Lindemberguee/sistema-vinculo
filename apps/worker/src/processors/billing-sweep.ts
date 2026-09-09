@@ -4,9 +4,11 @@ const GRACE_DAYS = 10;
 
 /**
  * Daily billing pass (manual billing model — no card charging yet):
- *  - paid-plan subscriptions past their period end → PAST_DUE
+ *  - TRIALING/ACTIVE paid-plan subscriptions past their period end → PAST_DUE
+ *    (this is also how a 30-day trial lapses into a bill)
  *  - PAST_DUE for more than GRACE_DAYS → suspend the org
- * Free plans (monthlyCents = 0) never enter. Reactivation is manual (admin marks paid).
+ * Only $0 plans (monthlyCents = 0) are exempt — the "Inicial" plan is paid, so
+ * a trial on it does lapse here. Reactivation is manual (admin marks paid).
  */
 export async function runBillingSweep(): Promise<{ pastDue: number; suspended: number }> {
   const now = new Date();

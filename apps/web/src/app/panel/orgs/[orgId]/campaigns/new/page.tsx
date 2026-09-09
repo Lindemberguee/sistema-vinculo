@@ -13,7 +13,9 @@ export default async function NewCampaign({ params }: { params: Promise<{ orgId:
         description="Depois de criar você vai direto para o editor de página."
         back={{ href: `/orgs/${orgId}/campaigns`, label: "Campanhas" }}
       />
-      <CampaignForm orgId={orgId} />
+      <div className="max-w-xl rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6">
+        <CampaignForm orgId={orgId} />
+      </div>
     </>
   );
 }

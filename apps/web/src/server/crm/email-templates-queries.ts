@@ -2,7 +2,6 @@ import "server-only";
 import {
   EMAIL_TEMPLATES,
   EMAIL_TEMPLATE_KINDS,
-  WIRED_TEMPLATE_KINDS,
   normalizeEmailBlocks,
   renderEmailBlocks,
   renderTemplate,
@@ -18,7 +17,6 @@ export interface TemplateListItem {
   meta: TemplateMeta;
   customized: boolean;
   enabled: boolean;
-  wired: boolean;
 }
 
 export async function getEmailTemplateList(db: Db, organizationId: string): Promise<TemplateListItem[]> {
@@ -34,7 +32,6 @@ export async function getEmailTemplateList(db: Db, organizationId: string): Prom
       meta,
       customized: Boolean(row),
       enabled: meta.optIn ? Boolean(row?.enabled) : true,
-      wired: WIRED_TEMPLATE_KINDS.has(kind),
     };
   });
 }
@@ -47,7 +44,6 @@ export interface TemplateDetail {
   blocks: EmailBlock[];
   customized: boolean;
   enabled: boolean;
-  wired: boolean;
   logoUrl: string | null;
   /** Rendered HTML with sample values, for the live preview. */
   previewHtml: string;
@@ -128,7 +124,6 @@ export async function getEmailTemplate(
     blocks,
     customized: Boolean(row),
     enabled: meta.optIn ? Boolean(row?.enabled) : true,
-    wired: WIRED_TEMPLATE_KINDS.has(kind),
     logoUrl: cfg?.logoUrl ?? null,
     previewHtml: preview.html,
   };

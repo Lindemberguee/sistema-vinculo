@@ -33,8 +33,33 @@ const MAX_DUNNING_ATTEMPTS = 3;
  * whether the trigger is a webhook or the reconciliation sweep.
  */
 
+/**
+ * Guard against an inbound gateway event acting on a row it doesn't own.
+ * `expectedOrgId` is the org whose webhook secret authenticated the delivery
+ * (`GatewayEvent.organizationId`); `null`/`undefined` means the caller is the
+ * reconciliation sweep or a legacy event with no binding — skip the check.
+ * Returns `true` (and logs) when the caller must stop.
+ */
+function orgMismatch(
+  expectedOrgId: string | null | undefined,
+  actualOrgId: string,
+  ctx: string,
+): boolean {
+  if (expectedOrgId && expectedOrgId !== actualOrgId) {
+    console.error(
+      `[gateway-event] ${ctx}: event authenticated as org ${expectedOrgId} but the target belongs to org ${actualOrgId} — refusing to mutate`,
+    );
+    return true;
+  }
+  return false;
+}
+
 /** Move a PENDING/CREATED donation to PAID and update all aggregates. */
-export async function markChargePaid(chargeId: string, gatewayFeeCents = 0): Promise<"applied" | "noop"> {
+export async function markChargePaid(
+  chargeId: string,
+  gatewayFeeCents = 0,
+  expectedOrgId?: string | null,
+): Promise<"applied" | "noop"> {
   let applied = false;
   let hadEventTickets = false;
   let donorId: string | undefined;
@@ -45,6 +70,7 @@ export async function markChargePaid(chargeId: string, gatewayFeeCents = 0): Pro
     // Paid events are idempotent; terminal negative states must never be
     // resurrected by a late/out-of-order paid webhook.
     if (!donation || !["CREATED", "PENDING"].includes(donation.status)) return;
+    if (orgMismatch(expectedOrgId, donation.organizationId, "markChargePaid")) return;
     donorId = donation.donorId;
     emit = {
       organizationId: donation.organizationId,
@@ -202,6 +228,7 @@ export async function recordSubscriptionCharge(params: {
   subscriptionId: string;
   chargeId: string;
   gatewayFeeCents?: number;
+  expectedOrgId?: string | null;
 }): Promise<"applied" | "noop"> {
   const existing = await prisma.donation.findUnique({ where: { gatewayChargeId: params.chargeId }, select: { id: true } });
   if (existing) return "noop";
@@ -214,6 +241,7 @@ export async function recordSubscriptionCharge(params: {
     console.warn(`recordSubscriptionCharge: no plan for subscription ${params.subscriptionId}`);
     return "noop";
   }
+  if (orgMismatch(params.expectedOrgId, plan.organizationId, "recordSubscriptionCharge")) return "noop";
 
   const fees = calculateFees({
     amountCents: plan.amountCents,
@@ -305,12 +333,16 @@ export async function recordSubscriptionCharge(params: {
 }
 
 /** Card subscription charge failed → dunning. */
-export async function handleSubscriptionFailure(subscriptionId: string): Promise<void> {
+export async function handleSubscriptionFailure(
+  subscriptionId: string,
+  expectedOrgId?: string | null,
+): Promise<void> {
   const plan = await prisma.recurringPlan.findFirst({
     where: { gatewaySubscriptionId: subscriptionId },
     include: { donor: { select: { name: true, email: true } }, organization: { select: { displayName: true } } },
   });
   if (!plan || plan.status === "CANCELED") return;
+  if (orgMismatch(expectedOrgId, plan.organizationId, "handleSubscriptionFailure")) return;
 
   const attempts = plan.failedAttempts + 1;
   const sender = await resolveOrgSender(plan.organizationId);
@@ -359,12 +391,16 @@ export async function handleSubscriptionFailure(subscriptionId: string): Promise
   }
 }
 
-export async function markSubscriptionCanceled(subscriptionId: string): Promise<void> {
+export async function markSubscriptionCanceled(
+  subscriptionId: string,
+  expectedOrgId?: string | null,
+): Promise<void> {
   const plan = await prisma.recurringPlan.findFirst({
     where: { gatewaySubscriptionId: subscriptionId, status: { not: "CANCELED" } },
-    select: { id: true },
+    select: { id: true, organizationId: true },
   });
   if (!plan) return;
+  if (orgMismatch(expectedOrgId, plan.organizationId, "markSubscriptionCanceled")) return;
   await prisma.recurringPlan.update({
     where: { id: plan.id },
     data: { status: "CANCELED", canceledAt: new Date() },
@@ -391,7 +427,11 @@ async function releaseReservedEventTickets(donationId: string): Promise<void> {
 }
 
 /** FAILED / EXPIRED for a not-yet-paid charge. */
-export async function markChargeStatus(chargeId: string, status: DonationStatus): Promise<void> {
+export async function markChargeStatus(
+  chargeId: string,
+  status: DonationStatus,
+  expectedOrgId?: string | null,
+): Promise<void> {
   const donation = await prisma.donation.findUnique({
     where: { gatewayChargeId: chargeId },
     select: {
@@ -407,6 +447,7 @@ export async function markChargeStatus(chargeId: string, status: DonationStatus)
     },
   });
   if (!donation || !["CREATED", "PENDING"].includes(donation.status)) return;
+  if (orgMismatch(expectedOrgId, donation.organizationId, "markChargeStatus")) return;
 
   await prisma.donation.update({ where: { id: donation.id }, data: { status } });
   // Free any reserved raffle numbers / event seats so they return to the pool.
@@ -437,12 +478,17 @@ export async function markChargeStatus(chargeId: string, status: DonationStatus)
 }
 
 /** Reverse a PAID donation (refund / chargeback) and roll back aggregates. */
-export async function reverseCharge(chargeId: string, status: "REFUNDED" | "CHARGED_BACK"): Promise<void> {
+export async function reverseCharge(
+  chargeId: string,
+  status: "REFUNDED" | "CHARGED_BACK",
+  expectedOrgId?: string | null,
+): Promise<void> {
   let emit: { organizationId: string; donationId: string } | undefined;
 
   await prisma.$transaction(async (tx) => {
     const donation = await tx.donation.findUnique({ where: { gatewayChargeId: chargeId } });
     if (!donation || donation.status !== "PAID") return;
+    if (orgMismatch(expectedOrgId, donation.organizationId, "reverseCharge")) return;
     emit = { organizationId: donation.organizationId, donationId: donation.id };
 
     await tx.donation.update({ where: { id: donation.id }, data: { status, refundedAt: new Date() } });

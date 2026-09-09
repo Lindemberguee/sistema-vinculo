@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@donation/db";
+import { prisma, parsePlanLimits } from "@donation/db";
 import { addInterval, isAppError } from "@donation/shared";
 import { requirePlatformAdmin } from "@/server/admin-helpers";
 
@@ -14,11 +14,23 @@ export interface AdminResult {
 export async function adminChangePlan(organizationId: string, planId: string): Promise<AdminResult> {
   try {
     const { userId } = await requirePlatformAdmin();
-    const plan = await prisma.plan.findUnique({ where: { id: planId }, select: { id: true } });
+    const plan = await prisma.plan.findUnique({ where: { id: planId }, select: { id: true, limits: true } });
     if (!plan) return { ok: false, error: "Plano não encontrado" };
 
     const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { planId: true } });
     if (!org) return { ok: false, error: "Organização não encontrada" };
+
+    // Downgrade guard: don't strand an org above the target plan's seat limit.
+    const targetMaxUsers = parsePlanLimits(plan.limits).maxUsers;
+    if (targetMaxUsers != null) {
+      const members = await prisma.membership.count({ where: { organizationId } });
+      if (members > targetMaxUsers) {
+        return {
+          ok: false,
+          error: `A organização tem ${members} usuários; o plano permite ${targetMaxUsers}. Remova ${members - targetMaxUsers} antes de trocar.`,
+        };
+      }
+    }
 
     await prisma.$transaction([
       prisma.organization.update({ where: { id: organizationId }, data: { planId } }),

@@ -42,7 +42,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ orgId: 
 
   try {
     const created = await prisma.gatewayEvent.createMany({
-      data: [{ id: event.id, type: event.type, payload: event.data as object }],
+      // `organizationId` binds this event to the org whose secret just verified
+      // it — the worker won't touch another org's donation with it.
+      data: [{ id: event.id, type: event.type, payload: event.data as object, organizationId: orgId }],
       skipDuplicates: true,
     });
     // A previous delivery may have committed the inbox row but failed before

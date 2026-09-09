@@ -47,41 +47,40 @@ export function CampaignForm({ orgId }: { orgId: string }) {
   }, []);
 
   return (
-    <form action={formAction} className="mt-2 max-w-xl">
-      <div className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6">
-        <Field label="Título da campanha" required error={err("title")}>
+    <form action={formAction} className="grid gap-5">
+      <Field label="Título da campanha" required error={err("title")}>
+        <Input
+          name="title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Ex.: Água limpa para todos"
+          className="text-base"
+          autoFocus
+          required
+        />
+      </Field>
+
+      <div>
+        <Field label="Endereço da página" required error={err("slug")}>
           <Input
-            name="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Ex.: Água limpa para todos"
-            className="text-base"
-            autoFocus
+            name="slug"
+            value={effectiveSlug}
+            onChange={(e) => {
+              setSlugTouched(true);
+              setSlug(slugify(e.target.value));
+            }}
+            placeholder="agua-limpa"
+            inputMode="url"
             required
           />
         </Field>
+        <p className="mt-1 truncate text-xs text-muted">
+          {previewHost}/<span className="font-medium text-ink">{effectiveSlug || "…"}</span>
+        </p>
+      </div>
 
-        <div className="mt-4">
-          <Field label="Endereço da página" required error={err("slug")}>
-            <Input
-              name="slug"
-              value={effectiveSlug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                setSlug(slugify(e.target.value));
-              }}
-              placeholder="agua-limpa"
-              inputMode="url"
-              required
-            />
-          </Field>
-          <p className="mt-1 truncate text-xs text-muted">
-            {previewHost}/<span className="font-medium text-ink">{effectiveSlug || "…"}</span>
-          </p>
-        </div>
-
-        <fieldset className="mt-5 border-0 p-0">
-          <legend className="label mb-2">Tipo de campanha</legend>
+      <fieldset className="border-0 p-0">
+        <legend className="label mb-2">Tipo de campanha</legend>
           <div role="radiogroup" aria-label="Tipo de campanha" className="grid gap-2 sm:grid-cols-2">
             {TYPES.map((t) => {
               const active = type === t.value;
@@ -116,42 +115,41 @@ export function CampaignForm({ orgId }: { orgId: string }) {
           <input type="hidden" name="type" value={type} />
         </fieldset>
 
-        <div className="mt-5">
-          <Field label="Meta de arrecadação" optional error={err("goalReais")}>
-            <div className="flex items-center rounded-md border border-line-strong bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15">
-              <span className="pl-3 text-sm font-medium text-muted" aria-hidden>
-                R$
-              </span>
-              <input
-                name="goalReais"
-                value={goal}
-                onChange={(e) => setGoal(e.target.value.replace(/[^\d.,]/g, ""))}
-                inputMode="decimal"
-                placeholder="0,00"
-                className="min-h-11 w-full bg-transparent px-2 text-sm text-ink tabular-nums placeholder:text-faint focus:outline-none"
-              />
-            </div>
-          </Field>
-          <p className="mt-1 text-xs text-muted">Mostra uma barra de progresso na página. Deixe em branco se não tiver meta.</p>
-        </div>
-
-        {/* Deferred to the editor — sent with sensible defaults so the schema is happy. */}
-        <input type="hidden" name="summary" value="" />
-        <input type="hidden" name="minAmountReais" value="5" />
-        <input type="hidden" name="suggestedAmountsCents" value="20, 50, 100, 250" />
-        <input type="hidden" name="allowRecurring" value="true" />
-        <input type="hidden" name="allowTip" value="true" />
-        <input type="hidden" name="seoTitle" value="" />
-        <input type="hidden" name="seoDescription" value="" />
-
-        {state?.error && (
-          <p className="mt-4 field-error" role="alert">
-            {state.error}
-          </p>
-        )}
+      <div>
+        <Field label="Meta de arrecadação" optional error={err("goalReais")}>
+          <div className="flex items-center rounded-md border border-line-strong bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15">
+            <span className="pl-3 text-sm font-medium text-muted" aria-hidden>
+              R$
+            </span>
+            <input
+              name="goalReais"
+              value={goal}
+              onChange={(e) => setGoal(e.target.value.replace(/[^\d.,]/g, ""))}
+              inputMode="decimal"
+              placeholder="0,00"
+              className="min-h-11 w-full bg-transparent px-2 text-sm text-ink tabular-nums placeholder:text-faint focus:outline-none"
+            />
+          </div>
+        </Field>
+        <p className="mt-1 text-xs text-muted">Mostra uma barra de progresso na página. Deixe em branco se não tiver meta.</p>
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
+      {/* Deferred to the editor — sent with sensible defaults so the schema is happy. */}
+      <input type="hidden" name="summary" value="" />
+      <input type="hidden" name="minAmountReais" value="5" />
+      <input type="hidden" name="suggestedAmountsCents" value="20, 50, 100, 250" />
+      <input type="hidden" name="allowRecurring" value="true" />
+      <input type="hidden" name="allowTip" value="true" />
+      <input type="hidden" name="seoTitle" value="" />
+      <input type="hidden" name="seoDescription" value="" />
+
+      {state?.error && (
+        <p className="field-error" role="alert">
+          {state.error}
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
         <Button type="submit" loading={pending} disabled={title.trim().length < 3}>
           {pending ? "Criando…" : "Criar e abrir o editor"}
         </Button>

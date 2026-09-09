@@ -192,9 +192,11 @@ export default async function CampaignSettings({
       </div>
 
       <CampaignTabNav
-        tabs={TABS}
+        tabs={TABS.map((t) => ({
+          ...t,
+          href: `/orgs/${orgId}/campaigns/${campaignId}?tab=${t.key}`,
+        }))}
         current={tab}
-        hrefFor={(key) => `/orgs/${orgId}/campaigns/${campaignId}?tab=${key}`}
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">

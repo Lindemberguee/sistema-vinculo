@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { prisma, type CampaignCategory } from "@donation/db";
+import { prisma, parsePlanLimits, type CampaignCategory } from "@donation/db";
 import { formatBRL } from "@donation/shared";
 import { resolveTenant } from "@/server/tenant";
 import { DEFAULT_ACCENT } from "@/blocks/accent";
@@ -14,9 +14,11 @@ async function loadOrg(hostParam: string) {
   if (!tenant || tenant.kind !== "site") return null;
   const org = await prisma.organization.findUnique({
     where: { id: tenant.organizationId },
-    select: { id: true, displayName: true, branding: true },
+    select: { id: true, displayName: true, branding: true, planId: true },
   });
-  return org;
+  if (!org) return null;
+  const plan = await prisma.plan.findUnique({ where: { id: org.planId }, select: { limits: true } });
+  return { ...org, removeBranding: parsePlanLimits(plan?.limits).removeBranding };
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ host: string }> }): Promise<Metadata> {
@@ -160,9 +162,11 @@ export default async function OrgDirectory({
         )}
       </main>
 
-      <footer className="border-t border-line bg-surface py-5 text-center text-xs text-faint">
-        Feito com a plataforma de doações.
-      </footer>
+      {!org.removeBranding && (
+        <footer className="border-t border-line bg-surface py-5 text-center text-xs text-faint">
+          Feito com a plataforma de doações.
+        </footer>
+      )}
     </div>
   );
 }
