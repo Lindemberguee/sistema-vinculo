@@ -3,6 +3,7 @@ import { prisma } from "@donation/db";
 import { formatBRL } from "@donation/shared";
 import { requirePlatformAdminPage } from "@/server/admin-helpers";
 import { AdminOrgActions } from "@/components/admin/AdminOrgRow";
+import { NewOrgButton } from "@/components/admin/NewOrgButton";
 import { appPanelOrigin, orgPublicOrigin } from "@/server/links/url";
 import { PageHeader, Card, CardBody, Table, Th, Td, Tr, StatusBadge, Badge } from "@/components/ui";
 
@@ -58,7 +59,14 @@ export default async function AdminOrgs() {
       <PageHeader
         title="Organizações"
         description="Operação, planos, KYC, gateways e volume financeiro por cliente."
-        actions={<Link href="/admin" className="btn-secondary btn-sm no-underline">← Visão geral</Link>}
+        actions={
+          <div className="flex items-center gap-2">
+            <NewOrgButton plans={plans} />
+            <Link href="/admin" className="btn-secondary btn-sm no-underline">
+              ← Visão geral
+            </Link>
+          </div>
+        }
       />
 
       <section className="mb-5 grid gap-4 md:grid-cols-4">

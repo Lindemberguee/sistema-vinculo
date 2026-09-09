@@ -1,0 +1,89 @@
+Comparativo de custo para a ONG por volume de doacoes/mes;;;;
+;;;;
+PREMISSAS;;;;
+Metodo;100% Pix (blocos A e B) / 100% cartao a vista (bloco C);;;
+Ticket medio;R$ 50,00  (numero de doacoes = volume / 50);;;
+Nossa comissao de plataforma;0% (BYOG - a ONG usa o gateway dela);;;
+Gateway - referencia publica Pagar.me;Pix 1,19% + R$ 0,99 por doacao  /  Cartao a vista 4,39% + R$ 0,99;;;
+Gateway - negociado (comum acima de ~R$ 10 mil/mes);Pix ~0,99% + R$ 0,00;;;
+Mensalidade nossa;Inicial R$ 99  /  Essencial R$ 249  /  Crescimento R$ 549  (30 dias gratis);;;
+Concorrentes;taxa "all-in" (plataforma + gateway juntos), referencia publica - CONFIRMAR;;;
+;;;;
+;;;;
+VOLUME DE DOACOES POR MES;R$ 1.000;R$ 5.000;R$ 10.000;R$ 30.000
+Numero de doacoes (ticket R$ 50);20;100;200;600
+;;;;
+;;;;
+BLOCO A - CUSTO TOTAL MENSAL (taxa + mensalidade) - 100% PIX, GATEWAY DE REFERENCIA;;;;
+Nos - plano Inicial (R$ 99);R$ 130,70;R$ 257,50;R$ 416,00;R$ 1.050,00
+Nos - plano Essencial (R$ 249);R$ 280,70;R$ 407,50;R$ 566,00;R$ 1.200,00
+Nos - plano Crescimento (R$ 549);R$ 580,70;R$ 707,50;R$ 866,00;R$ 1.500,00
+Doare - plano gratuito (~6% + R$ 0,39);R$ 67,80;R$ 339,00;R$ 678,00;R$ 2.034,00
+Vakinha (~6,4% + R$ 0,50);R$ 74,00;R$ 370,00;R$ 740,00;R$ 2.220,00
+Kickante (~10%);R$ 100,00;R$ 500,00;R$ 1.000,00;R$ 3.000,00
+apoia.se - recorrente (~12%);R$ 120,00;R$ 600,00;R$ 1.200,00;R$ 3.600,00
+Benfeitoria / Catarse (~13% all-in);R$ 130,00;R$ 650,00;R$ 1.300,00;R$ 3.900,00
+;;;;
+;;;;
+BLOCO A - % EFETIVO SOBRE O ARRECADADO;;;;
+Nos - plano Inicial (R$ 99);13,07%;5,15%;4,16%;3,50%
+Nos - plano Essencial (R$ 249);28,07%;8,15%;5,66%;4,00%
+Nos - plano Crescimento (R$ 549);58,07%;14,15%;8,66%;5,00%
+Doare - plano gratuito;6,78%;6,78%;6,78%;6,78%
+Vakinha;7,40%;7,40%;7,40%;7,40%
+Kickante;10,00%;10,00%;10,00%;10,00%
+apoia.se;12,00%;12,00%;12,00%;12,00%
+Benfeitoria / Catarse;13,00%;13,00%;13,00%;13,00%
+;;;;
+;;;;
+BLOCO A - LIQUIDO REAL QUE FICA COM A ONG (volume - custo total);;;;
+Nos - plano Inicial (R$ 99);R$ 869,30;R$ 4.742,50;R$ 9.584,00;R$ 28.950,00
+Doare - plano gratuito;R$ 932,20;R$ 4.661,00;R$ 9.322,00;R$ 27.966,00
+Vakinha;R$ 926,00;R$ 4.630,00;R$ 9.260,00;R$ 27.780,00
+apoia.se;R$ 880,00;R$ 4.400,00;R$ 8.800,00;R$ 26.400,00
+Benfeitoria / Catarse;R$ 870,00;R$ 4.350,00;R$ 8.700,00;R$ 26.100,00
+Diferenca Nos Inicial vs Catarse (a mais para a causa);-R$ 0,70;+R$ 392,50;+R$ 884,00;+R$ 2.850,00
+Diferenca Nos Inicial vs Doare gratuito;-R$ 62,90;+R$ 81,50;+R$ 262,00;+R$ 984,00
+;;;;
+;;;;
+BLOCO B - CUSTO TOTAL MENSAL - 100% PIX, GATEWAY NEGOCIADO (~0,99% + R$ 0);;;;
+Nos - plano Inicial (R$ 99);R$ 108,90;R$ 148,50;R$ 198,00;R$ 396,00
+Nos - plano Essencial (R$ 249);R$ 258,90;R$ 298,50;R$ 348,00;R$ 546,00
+Nos - plano Crescimento (R$ 549);R$ 558,90;R$ 598,50;R$ 648,00;R$ 846,00
+Doare - plano gratuito (comparacao);R$ 67,80;R$ 339,00;R$ 678,00;R$ 2.034,00
+Vakinha (comparacao);R$ 74,00;R$ 370,00;R$ 740,00;R$ 2.220,00
+Benfeitoria / Catarse (comparacao);R$ 130,00;R$ 650,00;R$ 1.300,00;R$ 3.900,00
+;;;;
+BLOCO B - % EFETIVO;;;;
+Nos - plano Inicial (R$ 99);10,89%;2,97%;1,98%;1,32%
+Nos - plano Essencial (R$ 249);25,89%;5,97%;3,48%;1,82%
+;;;;
+;;;;
+BLOCO C - CUSTO TOTAL MENSAL (taxa + mensalidade) - 100% CARTAO A VISTA;;;;
+Nos - plano Inicial (R$ 99) - cartao 4,39% + R$ 0,99;R$ 162,70;R$ 417,50;R$ 736,00;R$ 2.010,00
+Nos - plano Essencial (R$ 249);R$ 312,70;R$ 567,50;R$ 886,00;R$ 2.160,00
+Doare - plano gratuito (~8% cartao, estimado);R$ 80,00;R$ 400,00;R$ 800,00;R$ 2.400,00
+Vakinha (~8,4% + R$ 0,50, estimado);R$ 94,00;R$ 470,00;R$ 940,00;R$ 2.820,00
+Benfeitoria / Catarse (~15% all-in, estimado);R$ 150,00;R$ 750,00;R$ 1.500,00;R$ 4.500,00
+apoia.se (~14%, estimado);R$ 140,00;R$ 700,00;R$ 1.400,00;R$ 4.200,00
+;;;;
+BLOCO C - % EFETIVO;;;;
+Nos - plano Inicial (R$ 99);16,27%;8,35%;7,36%;6,70%
+Nos - plano Essencial (R$ 249);31,27%;11,35%;8,86%;7,20%
+Doare - plano gratuito (estimado);8,00%;8,00%;8,00%;8,00%
+Benfeitoria / Catarse (estimado);15,00%;15,00%;15,00%;15,00%
+;;;;
+;;;;
+RESUMO - A PARTIR DE QUANTO A MENSALIDADE "SE PAGA" (vs plataforma que fica com X%);;;;
+;vs 6%;vs 8%;vs 12%;vs 13%
+Inicial (R$ 99);R$ 1.650/mes;R$ 1.238/mes;R$ 825/mes;R$ 762/mes
+Essencial (R$ 249);R$ 4.150/mes;R$ 3.113/mes;R$ 2.075/mes;R$ 1.915/mes
+Crescimento (R$ 549);R$ 9.150/mes;R$ 6.863/mes;R$ 4.575/mes;R$ 4.223/mes
+;;;;
+;;;;
+OBSERVACOES;;;;
+1;Taxas das concorrentes sao referencia publica e mudam - confirmar em doare.org/planos, vakinha.com.br/taxas-e-prazos, etc.;;;
+2;Nas concorrentes a taxa ja inclui o gateway. No nosso modelo, 0% de plataforma + a conta de pagamento e da propria ONG (negociavel por volume).;;;
+3;A taxa fixa por doacao (R$ 0,99 no bloco A) pesa quando ha muitas doacoes pequenas. Com ticket maior ou Pix negociado (bloco B), o custo cai bastante.;;;
+4;Nao inclui antecipacao de recebiveis, TED/saque, impostos nem parcelamento no cartao.;;;
+5;Em baixo volume (~R$ 1.000/mes) a mensalidade domina e as plataformas sem mensalidade saem na frente. O nosso modelo compensa a partir de ~R$ 1.650/mes arrecadados.;;;
