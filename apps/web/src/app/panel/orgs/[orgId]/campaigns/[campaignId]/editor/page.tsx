@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { safeParseBlocks } from "@donation/blocks";
+import { safeParseBlocksDraft } from "@donation/blocks";
 import { requireOrgAccessPage } from "@/server/auth-helpers";
 import { Studio } from "@/blocks/studio/Studio";
 import type { EditorBlock } from "@/blocks/studio/studio-reducer";
@@ -28,7 +28,7 @@ export default async function EditorPage({
   });
   if (!campaign?.page) notFound();
 
-  const parsed = safeParseBlocks(campaign.page.blocks);
+  const parsed = safeParseBlocksDraft(campaign.page.blocks);
   const blocks = (parsed.success ? parsed.data : []) as unknown as EditorBlock[];
 
   const branding = (campaign.organization.branding ?? {}) as {

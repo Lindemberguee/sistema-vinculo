@@ -486,3 +486,12 @@ export function parseBlocks(input: unknown): PageBlocks {
 export function safeParseBlocks(input: unknown) {
   return PageBlocks.safeParse(input);
 }
+
+/**
+ * Load a work-in-progress draft (the editor / draft preview). Uses the loose
+ * `PageBlocksDraft` so a half-configured block — the exact shape autosave
+ * persists — round-trips back into the editor instead of parsing to `[]`.
+ */
+export function safeParseBlocksDraft(input: unknown) {
+  return PageBlocksDraft.safeParse(input);
+}
