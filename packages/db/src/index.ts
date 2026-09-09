@@ -15,11 +15,24 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 /**
  * Neon (serverless Postgres) recycles idle pooled connections; the first query
  * after a recycle fails with P1017 "Server has closed the connection" (also
- * P1001/P1002 on a cold compute). Prisma reconnects on its own, so wrap
- * READ-ONLY aggregate paths (dashboards, list summaries) in this to make the
- * drop invisible instead of 500-ing a panel page. Never wrap writes.
+ * P1001/P1002 on a cold compute) — or, on Windows, a bare socket reset
+ * (`ECONNRESET` / OS error 10054) that Prisma surfaces without a `Pxxxx` code.
+ * Prisma reconnects on its own, so wrap READ-ONLY paths (dashboards, list
+ * summaries, auth membership lookups) in this to make the drop invisible
+ * instead of 500-ing a panel page. Never wrap writes.
  */
 const RETRYABLE_CODES = new Set(["P1017", "P1001", "P1002"]);
+const RETRYABLE_MESSAGE_RE =
+  /server has closed the connection|connection (?:reset|closed|is closed)|ECONNRESET|10054|kind: Closed|Timed out fetching a new connection/i;
+
+function isRetryableDbError(err: unknown): boolean {
+  const code = (err as { code?: string }).code;
+  if (code && RETRYABLE_CODES.has(code)) return true;
+  const name = (err as { name?: string }).name ?? "";
+  if (name === "PrismaClientRustPanicError" || name === "PrismaClientInitializationError") return true;
+  const msg = err instanceof Error ? `${err.message}` : String(err);
+  return RETRYABLE_MESSAGE_RE.test(msg);
+}
 
 export async function withDbRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
   let lastErr: unknown;
@@ -27,8 +40,7 @@ export async function withDbRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T
     try {
       return await fn();
     } catch (err) {
-      const code = (err as { code?: string }).code;
-      if (!code || !RETRYABLE_CODES.has(code) || attempt === tries - 1) throw err;
+      if (!isRetryableDbError(err) || attempt === tries - 1) throw err;
       lastErr = err;
       await new Promise((r) => setTimeout(r, 120 * (attempt + 1)));
     }

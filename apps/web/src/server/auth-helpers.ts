@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { ForbiddenError, roleAllows, UnauthorizedError, type OrgRole } from "@donation/shared";
-import { prisma, tenantPrisma } from "@donation/db";
+import { prisma, tenantPrisma, withDbRetry } from "@donation/db";
 import { auth, type SessionMembership } from "@/auth";
 
 /**
@@ -16,12 +16,18 @@ import { auth, type SessionMembership } from "@/auth";
  * from the DB on every org-scoped guard so `removeMember` / `changeMemberRole`
  * take effect on the victim's very next request. Also lets a freshly-invited
  * user in without waiting for their token to refresh.
+ *
+ * This now sits in the render path of every panel page, so it must survive a
+ * Neon pooled-connection recycle (P1017 & co.) — hence `withDbRetry`. Without
+ * it, one dropped connection here 500s an otherwise fine page.
  */
 async function currentMembership(userId: string, organizationId: string): Promise<SessionMembership | null> {
-  const row = await prisma.membership.findUnique({
-    where: { userId_organizationId: { userId, organizationId } },
-    select: { role: true, organization: { select: { id: true, slug: true, displayName: true } } },
-  });
+  const row = await withDbRetry(() =>
+    prisma.membership.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true, organization: { select: { id: true, slug: true, displayName: true } } },
+    }),
+  );
   if (!row) return null;
   return {
     organizationId: row.organization.id,
