@@ -4,9 +4,10 @@ import { Suspense, useActionState, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import { Check } from "lucide-react";
 import { registerUser, type AuthActionResult } from "@/server/auth/actions";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { Field, Input, Button } from "@/components/ui";
+import { Field, Input, PasswordInput, Button } from "@/components/ui";
 
 function RegisterForm() {
   const params = useSearchParams();
@@ -31,37 +32,54 @@ function RegisterForm() {
 
   if (state?.ok) {
     return (
-      <p className="mt-3 text-sm text-muted">
-        Conta criada! Enviamos um e-mail de confirmação para <strong>{state.email}</strong>.{" "}
-        {signingIn ? "Entrando…" : "Você já pode continuar."}
-      </p>
+      <div className="mt-5">
+        <span className="grid size-10 place-items-center rounded-full bg-success-bg text-success">
+          <Check className="size-5" aria-hidden />
+        </span>
+        <p className="mt-3 text-sm text-muted">
+          Conta criada! Enviamos um e-mail de confirmação para{" "}
+          <span className="font-medium text-ink">{state.email}</span>.{" "}
+          {signingIn ? "Entrando…" : "Você já pode continuar."}
+        </p>
+      </div>
     );
   }
 
   return (
     <>
-      <form id="register-form" action={action} className="mt-4 grid gap-3">
-        <Field label="Nome" error={err("name")}>
+      <form id="register-form" action={action} className="mt-5 grid gap-3">
+        <Field label="Nome" required error={err("name")}>
           <Input name="name" required autoComplete="name" maxLength={120} />
         </Field>
-        <Field label="E-mail" error={err("email")}>
+        <Field label="E-mail" required error={err("email")}>
           <Input name="email" type="email" required autoComplete="email" maxLength={160} />
         </Field>
-        <Field label="Senha" error={err("password")} hint="Mínimo de 8 caracteres.">
-          <Input name="password" type="password" required minLength={8} autoComplete="new-password" />
+        <Field label="Senha" required error={err("password")} hint="Mínimo de 8 caracteres.">
+          <PasswordInput name="password" required minLength={8} autoComplete="new-password" />
         </Field>
-        <Field label="Confirmar senha" error={err("confirm")}>
-          <Input name="confirm" type="password" required minLength={8} autoComplete="new-password" />
+        <Field label="Confirmar senha" required error={err("confirm")}>
+          <PasswordInput name="confirm" required minLength={8} autoComplete="new-password" />
         </Field>
-        {state?.error && <p className="field-error">{state.error}</p>}
-        <Button type="submit" disabled={pending} className="w-full">
+        {state?.error && (
+          <p className="field-error" role="alert">
+            {state.error}
+          </p>
+        )}
+        <Button type="submit" loading={pending} className="w-full">
           {pending ? "Criando…" : "Criar conta"}
         </Button>
       </form>
-      <Button variant="secondary" onClick={() => signIn("google", { callbackUrl })} className="mt-3 w-full">
+
+      <div className="my-4 flex items-center gap-3 text-xs text-faint">
+        <span className="h-px flex-1 bg-line" />
+        ou
+        <span className="h-px flex-1 bg-line" />
+      </div>
+      <Button variant="secondary" onClick={() => signIn("google", { callbackUrl })} className="w-full">
         Continuar com Google
       </Button>
-      <p className="mt-4 text-center text-sm text-muted">
+
+      <p className="mt-5 text-center text-sm text-muted">
         Já tem conta?{" "}
         <Link href="/login" className="link">
           Entrar
