@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { ForbiddenError, roleAllows, UnauthorizedError, type OrgRole } from "@donation/shared";
-import { prisma, tenantPrisma, withDbRetry } from "@donation/db";
+import { tenantPrisma, withDbRetry } from "@donation/db";
 import { auth, type SessionMembership } from "@/auth";
 
 /**
@@ -14,27 +14,41 @@ import { auth, type SessionMembership } from "@/auth";
  * explicit `update()` — so a removed member or a demoted role would stay valid
  * for the life of the token (NextAuth default: 30 days). Re-read the membership
  * from the DB on every org-scoped guard so `removeMember` / `changeMemberRole`
- * take effect on the victim's very next request. Also lets a freshly-invited
- * user in without waiting for their token to refresh.
+ * take effect on the victim's next request, and a freshly-invited user gets in
+ * without waiting for a token refresh.
  *
- * This now sits in the render path of every panel page, so it must survive a
- * Neon pooled-connection recycle (P1017 & co.) — hence `withDbRetry`. Without
- * it, one dropped connection here 500s an otherwise fine page.
+ * This sits in the render path of every panel page, so it must be resilient:
+ *  - go through `tenantPrisma` so RLS (`DB_RLS=on`) pins its GUC and the read is
+ *    honest instead of silently returning zero rows;
+ *  - retry a dropped Neon pooled connection (`withDbRetry`);
+ *  - if the DB is unreachable, fall back to the JWT membership rather than
+ *    locking a legitimate member out of their own org.
+ * A successful read that finds nothing DOES mean "not a member" — only an
+ * outright failure falls back.
  */
-async function currentMembership(userId: string, organizationId: string): Promise<SessionMembership | null> {
-  const row = await withDbRetry(() =>
-    prisma.membership.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true, organization: { select: { id: true, slug: true, displayName: true } } },
-    }),
-  );
-  if (!row) return null;
-  return {
-    organizationId: row.organization.id,
-    slug: row.organization.slug,
-    displayName: row.organization.displayName,
-    role: row.role as OrgRole,
-  };
+async function currentMembership(
+  userId: string,
+  organizationId: string,
+  fallback: SessionMembership | null,
+): Promise<SessionMembership | null> {
+  try {
+    const row = await withDbRetry(() =>
+      tenantPrisma(organizationId).membership.findFirst({
+        where: { userId },
+        select: { role: true, organization: { select: { id: true, slug: true, displayName: true } } },
+      }),
+    );
+    if (!row) return null;
+    return {
+      organizationId: row.organization.id,
+      slug: row.organization.slug,
+      displayName: row.organization.displayName,
+      role: row.role as OrgRole,
+    };
+  } catch (err) {
+    console.error(`currentMembership(${organizationId}) failed, falling back to session:`, err);
+    return fallback;
+  }
 }
 
 export async function requireUser() {
@@ -63,7 +77,8 @@ export interface OrgAccess {
  */
 export async function requireOrgAccess(organizationId: string, minRole: OrgRole = "VIEWER"): Promise<OrgAccess> {
   const user = await requireUser();
-  const membership = await currentMembership(user.id, organizationId);
+  const sessionMembership = user.memberships.find((m) => m.organizationId === organizationId) ?? null;
+  const membership = await currentMembership(user.id, organizationId, sessionMembership);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
   if (!roleAllows(membership.role, minRole)) {
     throw new ForbiddenError(`Requires ${minRole} role or higher`);
@@ -74,7 +89,8 @@ export async function requireOrgAccess(organizationId: string, minRole: OrgRole 
 /** Page variant: redirect to /login if signed out, 404 if not a member. */
 export async function requireOrgAccessPage(organizationId: string, minRole: OrgRole = "VIEWER") {
   const user = await requireUserPage();
-  const membership = await currentMembership(user.id, organizationId);
+  const sessionMembership = user.memberships.find((m) => m.organizationId === organizationId) ?? null;
+  const membership = await currentMembership(user.id, organizationId, sessionMembership);
   if (!membership || !roleAllows(membership.role, minRole)) notFound();
   return { userId: user.id, membership, db: tenantPrisma(organizationId) };
 }
