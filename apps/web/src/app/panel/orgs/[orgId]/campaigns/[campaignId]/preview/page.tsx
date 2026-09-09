@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Pencil } from "lucide-react";
-import { safeParseBlocks } from "@donation/blocks";
+import { safeParseBlocksDraft, type Block } from "@donation/blocks";
 import { resolveOrgPublicKey, parsePlanLimits } from "@donation/db";
 import { requireOrgAccessPage } from "@/server/auth-helpers";
 import { BlockList } from "@/blocks/render";
@@ -52,10 +52,12 @@ export default async function DraftPreview({ params }: { params: Promise<{ orgId
     select: { limits: true },
   });
   const pay = await resolveOrgPublicKey(orgId);
-  const parsed = safeParseBlocks(c.page.blocks);
-  const blocks =
+  const parsed = safeParseBlocksDraft(c.page.blocks);
+  // Draft blocks are loosely typed ({id,type,props}); the renderer reads props
+  // defensively, so a cast to Block[] is safe for the preview.
+  const blocks: Block[] =
     parsed.success && parsed.data.length > 0
-      ? parsed.data
+      ? (parsed.data as unknown as Block[])
       : defaultCampaignBlocks({
           title: c.title,
           slogan: c.slogan,

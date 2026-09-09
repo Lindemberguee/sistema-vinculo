@@ -134,35 +134,44 @@ export default async function CampaignPage({
           allowAmbassadors: data.campaign.allowAmbassadors,
         });
 
-  // Two-column reading layout: the donation checkout lives in a sticky right
-  // rail on desktop, the narrative flows on the left. A leading hero still spans
-  // full width. Falls back to a single stacked column when there is no checkout
-  // block (e.g. a raffle-only page).
+  // Layout: a leading hero spans full width; a trailing footer block spans full
+  // width. The donation checkout goes in a sticky right rail on lg+ ONLY when
+  // there's enough narrative beside it — otherwise it centers under the hero so
+  // a sparse page (raffle/auction-only) doesn't leave a huge empty column.
   const checkoutBlock = blocks.find((b) => b.type === "donationCheckout");
   const rest = blocks.filter((b) => b.type !== "donationCheckout");
-  const leadsWithHero = rest[0]?.type === "hero";
-  const heroBlock = leadsWithHero ? rest[0] : null;
-  const bodyBlocks = leadsWithHero ? rest.slice(1) : rest;
+  const heroBlock = rest[0]?.type === "hero" ? rest[0] : null;
+  const footerBlock = rest.length && rest[rest.length - 1]!.type === "footer" ? rest[rest.length - 1]! : null;
+  const bodyBlocks = rest.slice(heroBlock ? 1 : 0, footerBlock ? -1 : undefined);
+  const twoColumn = Boolean(checkoutBlock) && bodyBlocks.length > 0;
 
   return (
     <main id="top" className="@container min-h-screen bg-surface">
-      {checkoutBlock ? (
-        <>
-          {heroBlock && <BlockList blocks={[heroBlock]} ctx={data.ctx} />}
-          <div className="mx-auto grid max-w-6xl gap-x-10 px-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-6">
-            <div className="min-w-0">
-              <BlockList blocks={bodyBlocks} ctx={data.ctx} />
-            </div>
-            <aside className="px-5 py-8 sm:px-6 lg:px-0 lg:py-10">
-              <div className="lg:sticky lg:top-6">
-                <BlockList blocks={[checkoutBlock]} ctx={data.ctx} />
-              </div>
-            </aside>
+      {heroBlock && <BlockList blocks={[heroBlock]} ctx={data.ctx} />}
+
+      {twoColumn ? (
+        <div className="mx-auto grid max-w-6xl gap-x-10 px-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-6">
+          <div className="min-w-0">
+            <BlockList blocks={bodyBlocks} ctx={data.ctx} />
           </div>
-        </>
+          <aside className="px-5 py-8 sm:px-6 lg:px-0 lg:py-10">
+            <div className="lg:sticky lg:top-6">
+              <BlockList blocks={[checkoutBlock!]} ctx={data.ctx} />
+            </div>
+          </aside>
+        </div>
       ) : (
-        <BlockList blocks={blocks} ctx={data.ctx} />
+        <>
+          <BlockList blocks={bodyBlocks} ctx={data.ctx} />
+          {checkoutBlock && (
+            <div className="mx-auto flex max-w-[32rem] justify-center px-5 py-8 sm:px-6 sm:py-10">
+              <BlockList blocks={[checkoutBlock]} ctx={data.ctx} />
+            </div>
+          )}
+        </>
       )}
+
+      {footerBlock && <BlockList blocks={[footerBlock]} ctx={data.ctx} />}
     </main>
   );
 }
