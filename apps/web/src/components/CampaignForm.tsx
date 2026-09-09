@@ -1,126 +1,161 @@
 "use client";
 
-import { useActionState } from "react";
-import {
-  createCampaignFormAction,
-  updateCampaignFormAction,
-  type ActionResult,
-} from "@/server/campaigns/actions";
-import { Field, Input, Textarea, Select, Checkbox, Button } from "@/components/ui";
+import { useActionState, useMemo, useState } from "react";
+import { Check, Heart, HandCoins, CalendarDays, Users } from "lucide-react";
+import { createCampaignFormAction, type ActionResult } from "@/server/campaigns/actions";
+import { Field, Input, Button, cn } from "@/components/ui";
 
-export interface CampaignFormValues {
-  title: string;
-  slug: string;
-  summary: string;
-  type: string;
-  goalReais: string;
-  minAmountReais: string;
-  suggestedAmountsReais: string;
-  allowRecurring: boolean;
-  allowTip: boolean;
-  seoTitle: string;
-  seoDescription: string;
+const TYPES = [
+  { value: "DONATION", label: "Doação", desc: "Doações contínuas para a causa", icon: Heart },
+  { value: "CROWDFUNDING", label: "Vaquinha", desc: "Uma meta e um prazo", icon: HandCoins },
+  { value: "APADRINHAMENTO", label: "Apadrinhamento", desc: "Apoio mensal a uma pessoa", icon: Users },
+  { value: "EVENT", label: "Evento", desc: "Venda de ingressos", icon: CalendarDays },
+] as const;
+
+const DIACRITICS = /[̀-ͯ]/g;
+function slugify(s: string) {
+  return s
+    .normalize("NFD")
+    .replace(DIACRITICS, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
 }
 
-const EMPTY: CampaignFormValues = {
-  title: "",
-  slug: "",
-  summary: "",
-  type: "DONATION",
-  goalReais: "",
-  minAmountReais: "5",
-  suggestedAmountsReais: "20, 50, 100, 250",
-  allowRecurring: true,
-  allowTip: true,
-  seoTitle: "",
-  seoDescription: "",
-};
-
-export function CampaignForm({
-  orgId,
-  campaignId,
-  initial,
-}: {
-  orgId: string;
-  campaignId?: string;
-  initial?: Partial<CampaignFormValues>;
-}) {
-  const values = { ...EMPTY, ...initial };
-  const boundAction = campaignId
-    ? updateCampaignFormAction.bind(null, orgId, campaignId)
-    : createCampaignFormAction.bind(null, orgId);
-  const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(boundAction, null);
+/** Focused "create a campaign" step — the org fine-tunes everything else in the
+ * block editor it lands on right after. */
+export function CampaignForm({ orgId }: { orgId: string }) {
+  const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
+    createCampaignFormAction.bind(null, orgId),
+    null,
+  );
   const err = (k: string) => state?.fieldErrors?.[k]?.[0];
 
+  const [title, setTitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [type, setType] = useState<(typeof TYPES)[number]["value"]>("DONATION");
+  const [goal, setGoal] = useState("");
+
+  const effectiveSlug = slugTouched && slug ? slug : slugify(title);
+
+  const previewHost = useMemo(() => {
+    if (typeof window === "undefined") return "suaong.plataforma.com.br";
+    const parts = window.location.host.split(".");
+    return `suaong.${parts.slice(1).join(".") || "plataforma.com.br"}`;
+  }, []);
+
   return (
-    <form action={formAction} className="grid max-w-xl gap-4">
-      <Field label="Título" error={err("title")}>
-        <Input name="title" defaultValue={values.title} required />
-      </Field>
-
-      <Field label="Endereço (slug)" error={err("slug")} hint="Aparece na URL: slug.suaong.plataforma.com.br">
-        <Input name="slug" defaultValue={values.slug} required />
-      </Field>
-
-      <Field label="Resumo" error={err("summary")}>
-        <Textarea name="summary" defaultValue={values.summary} rows={2} />
-      </Field>
-
-      <Field label="Tipo" error={err("type")}>
-        <Select name="type" defaultValue={values.type}>
-          <option value="DONATION">Doação</option>
-          <option value="CROWDFUNDING">Vaquinha (com meta)</option>
-          <option value="APADRINHAMENTO">Apadrinhamento</option>
-          <option value="EVENT">Evento</option>
-        </Select>
-      </Field>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Meta (R$, opcional)" error={err("goalReais")}>
-          <Input name="goalReais" defaultValue={values.goalReais} inputMode="decimal" />
+    <form action={formAction} className="mt-2 max-w-xl">
+      <div className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6">
+        <Field label="Título da campanha" required error={err("title")}>
+          <Input
+            name="title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex.: Água limpa para todos"
+            className="text-base"
+            autoFocus
+            required
+          />
         </Field>
-        <Field label="Valor mínimo (R$)" error={err("minAmountReais")}>
-          <Input name="minAmountReais" defaultValue={values.minAmountReais} inputMode="decimal" required />
-        </Field>
+
+        <div className="mt-4">
+          <Field label="Endereço da página" required error={err("slug")}>
+            <Input
+              name="slug"
+              value={effectiveSlug}
+              onChange={(e) => {
+                setSlugTouched(true);
+                setSlug(slugify(e.target.value));
+              }}
+              placeholder="agua-limpa"
+              inputMode="url"
+              required
+            />
+          </Field>
+          <p className="mt-1 truncate text-xs text-muted">
+            {previewHost}/<span className="font-medium text-ink">{effectiveSlug || "…"}</span>
+          </p>
+        </div>
+
+        <fieldset className="mt-5 border-0 p-0">
+          <legend className="label mb-2">Tipo de campanha</legend>
+          <div role="radiogroup" aria-label="Tipo de campanha" className="grid gap-2 sm:grid-cols-2">
+            {TYPES.map((t) => {
+              const active = type === t.value;
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setType(t.value)}
+                  className={cn(
+                    "relative flex items-start gap-2.5 rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40",
+                    active
+                      ? "border-brand-600 bg-brand-50"
+                      : "border-line-strong hover:border-muted/40 hover:bg-canvas",
+                  )}
+                >
+                  {active && <Check className="absolute right-2 top-2 size-3.5 text-brand-700" aria-hidden />}
+                  <Icon
+                    className={cn("mt-0.5 size-4 shrink-0", active ? "text-brand-700" : "text-muted")}
+                    aria-hidden
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{t.label}</span>
+                    <span className="block text-xs text-muted">{t.desc}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <input type="hidden" name="type" value={type} />
+        </fieldset>
+
+        <div className="mt-5">
+          <Field label="Meta de arrecadação" optional error={err("goalReais")}>
+            <div className="flex items-center rounded-md border border-line-strong bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15">
+              <span className="pl-3 text-sm font-medium text-muted" aria-hidden>
+                R$
+              </span>
+              <input
+                name="goalReais"
+                value={goal}
+                onChange={(e) => setGoal(e.target.value.replace(/[^\d.,]/g, ""))}
+                inputMode="decimal"
+                placeholder="0,00"
+                className="min-h-11 w-full bg-transparent px-2 text-sm text-ink tabular-nums placeholder:text-faint focus:outline-none"
+              />
+            </div>
+          </Field>
+          <p className="mt-1 text-xs text-muted">Mostra uma barra de progresso na página. Deixe em branco se não tiver meta.</p>
+        </div>
+
+        {/* Deferred to the editor — sent with sensible defaults so the schema is happy. */}
+        <input type="hidden" name="summary" value="" />
+        <input type="hidden" name="minAmountReais" value="5" />
+        <input type="hidden" name="suggestedAmountsCents" value="20, 50, 100, 250" />
+        <input type="hidden" name="allowRecurring" value="true" />
+        <input type="hidden" name="allowTip" value="true" />
+        <input type="hidden" name="seoTitle" value="" />
+        <input type="hidden" name="seoDescription" value="" />
+
+        {state?.error && (
+          <p className="mt-4 field-error" role="alert">
+            {state.error}
+          </p>
+        )}
       </div>
 
-      <Field label="Valores sugeridos (R$, separados por vírgula)">
-        <Input name="suggestedAmountsCents" defaultValue={values.suggestedAmountsReais} />
-      </Field>
-
-      <Checkbox name="allowRecurring" value="true" defaultChecked={values.allowRecurring} label="Permitir doação mensal" />
-      <Checkbox
-        name="allowTip"
-        value="true"
-        defaultChecked={values.allowTip}
-        label="Permitir uma contribuição extra à causa"
-      />
-
-      <fieldset className="grid gap-3 rounded-lg border border-line p-4">
-        <legend className="px-1 text-xs text-muted">SEO</legend>
-        <Field label="Título para buscadores">
-          <Input name="seoTitle" defaultValue={values.seoTitle} />
-        </Field>
-        <Field label="Descrição para buscadores">
-          <Textarea name="seoDescription" defaultValue={values.seoDescription} rows={2} />
-        </Field>
-      </fieldset>
-
-      {state?.error && (
-        <p className="field-error" role="alert">
-          {state.error}
-        </p>
-      )}
-
-      <div className="flex items-center gap-3">
-        <Button type="submit" loading={pending}>
-          {pending ? "Salvando…" : campaignId ? "Salvar alterações" : "Criar campanha"}
+      <div className="mt-4 flex items-center gap-3">
+        <Button type="submit" loading={pending} disabled={title.trim().length < 3}>
+          {pending ? "Criando…" : "Criar e abrir o editor"}
         </Button>
-        {state?.ok && (
-          <span className="text-sm text-success" role="status" aria-live="polite">
-            Salvo
-          </span>
-        )}
+        <span className="text-xs text-muted">Valores, textos e blocos você ajusta no editor.</span>
       </div>
     </form>
   );

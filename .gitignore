@@ -28,3 +28,4 @@ packages/db/prisma/*.db
 .agents/
 .codex/
 
+env.example
