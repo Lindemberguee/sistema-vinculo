@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import {
@@ -9,7 +9,7 @@ import {
   deleteCampaignReport,
   type ActionResult,
 } from "@/server/campaigns/actions";
-import { Field, Input, Select, Checkbox, Button, cn } from "@/components/ui";
+import { Field, Input, Select, Switch, Button, cn } from "@/components/ui";
 import { MoneyListInput } from "@/components/MoneyListInput";
 import { SDG_GOALS, BIOMES, IMPACT_FOCUS } from "@/lib/impact";
 import { SectionCard, SaveBar } from "./EssentialTab";
@@ -41,6 +41,7 @@ export function ImpactTab({
     null,
   );
   const selected = new Set(initial.sdgGoals);
+  const [showBudget, setShowBudget] = useState(initial.showBudget);
 
   return (
     <div className="space-y-5">
@@ -71,12 +72,13 @@ export function ImpactTab({
         </SectionCard>
 
         <SectionCard title="Objetivos de Desenvolvimento Sustentável (ODS)" desc="Objetivos da ONU com que a campanha se conecta. Escolha quantos quiser.">
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Objetivos de Desenvolvimento Sustentável">
             {SDG_GOALS.map((g) => (
               <label
                 key={g.n}
                 className={cn(
                   "cursor-pointer rounded-full border px-2.5 py-1 text-xs transition-colors",
+                  "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500/40 has-[:focus-visible]:ring-offset-1",
                   selected.has(g.n)
                     ? "border-brand-600 bg-brand-50 font-medium text-brand-700"
                     : "border-line-strong text-muted hover:border-muted/40",
@@ -97,10 +99,10 @@ export function ImpactTab({
 
         <SectionCard title="Para onde vai o dinheiro" desc="Detalhe como os recursos serão aplicados.">
           <MoneyListInput name="budget" defaultValue={initial.budget} />
-          <Checkbox
-            name="showBudget"
-            value="true"
-            defaultChecked={initial.showBudget}
+          <input type="hidden" name="showBudget" value={showBudget ? "true" : ""} />
+          <Switch
+            checked={showBudget}
+            onCheckedChange={setShowBudget}
             label="Mostrar esse detalhamento na página da campanha"
           />
         </SectionCard>
@@ -128,11 +130,15 @@ export function ImpactTab({
           <Field label="Link do relatório" error={repState?.fieldErrors?.url?.[0]}>
             <Input name="url" type="url" placeholder="https://…" required />
           </Field>
-          <Button type="submit" size="sm" disabled={repPending}>
+          <Button type="submit" size="sm" loading={repPending}>
             {repPending ? "Adicionando…" : "Adicionar"}
           </Button>
         </form>
-        {repState?.ok && <p className="text-sm text-success">Relatório adicionado.</p>}
+        {repState?.ok && (
+          <p className="text-sm text-success" role="status" aria-live="polite">
+            Relatório adicionado.
+          </p>
+        )}
       </SectionCard>
     </div>
   );
@@ -152,9 +158,9 @@ function DeleteReport({ orgId, reportId }: { orgId: string; reportId: string }) 
           router.refresh();
         })
       }
-      className="grid size-7 shrink-0 place-items-center rounded-md text-muted transition-colors hover:bg-canvas hover:text-danger disabled:opacity-40"
+      className="grid size-9 shrink-0 place-items-center rounded-md text-muted transition-colors hover:bg-canvas hover:text-danger disabled:opacity-40"
     >
-      <Trash2 className="size-3.5" />
+      <Trash2 className="size-4" />
     </button>
   );
 }

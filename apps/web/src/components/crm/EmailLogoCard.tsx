@@ -36,10 +36,14 @@ export function EmailLogoCard({ orgId, logoUrl }: { orgId: string; logoUrl: stri
             placeholder="https://…/logo.png"
             className="w-64"
           />
-          <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+          <Button type="submit" size="sm" variant="secondary" loading={pending}>
             {pending ? "Salvando…" : "Salvar"}
           </Button>
-          {state?.error && <span className="field-error w-full">{state.error}</span>}
+          {state?.error && (
+            <span className="field-error w-full" role="alert">
+              {state.error}
+            </span>
+          )}
         </form>
       </CardBody>
     </Card>

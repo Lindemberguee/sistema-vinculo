@@ -99,6 +99,7 @@ export class PagarmeGateway implements PaymentGateway {
 
   async createOrder(input: CreateOrderInput): Promise<OrderResult> {
     const payment = this.buildPayment(input);
+    const documentDigits = (input.customer.document ?? "").replace(/\D/g, "");
 
     const phones = brPhones(input.customer.phone);
     const order = await this.request<PagarmeOrder>("/orders", {
@@ -109,10 +110,12 @@ export class PagarmeGateway implements PaymentGateway {
         customer: {
           name: input.customer.name,
           email: input.customer.email,
-          document: input.customer.document,
-          document_type: (input.customer.document ?? "").replace(/\D/g, "").length > 11 ? "CNPJ" : "CPF",
           type: "individual",
+          ...(documentDigits
+            ? { document: documentDigits, document_type: documentDigits.length > 11 ? "CNPJ" : "CPF" }
+            : {}),
           ...(phones ? { phones } : {}),
+          ...(input.customer.address ? { address: pagarmeAddress(input.customer.address) } : {}),
         },
         items: [{ code: "doacao", amount: input.chargeTotalCents, description: "Doação", quantity: 1 }],
         payments: [payment],
@@ -124,15 +127,33 @@ export class PagarmeGateway implements PaymentGateway {
     if (!charge) throw new PaymentError("Pagar.me order returned no charge", order);
 
     const tx = charge.last_transaction ?? {};
-    if (charge.status === "failed") {
-      console.error("[pagarme] charge failed:", JSON.stringify({ order_id: order.id, charge_id: charge.id, status: charge.status, last_transaction: tx }, null, 2));
+    // Pagar.me statuses: paid | pending | processing | authorized_pending_capture
+    // | failed | canceled | ...  Only "paid" and "failed" are terminal for us;
+    // anything else (3-D Secure, async auth) is "pending" and confirmed by webhook.
+    const status: OrderResult["status"] =
+      charge.status === "paid" ? "paid" : charge.status === "failed" ? "failed" : "pending";
+
+    const declineReason =
+      status === "failed" ? extractDecline(tx) : undefined;
+
+    if (status === "failed") {
+      console.error(
+        "[pagarme] charge failed:",
+        JSON.stringify(
+          { order_id: order.id, charge_id: charge.id, status: charge.status, decline: declineReason, last_transaction: tx },
+          null,
+          2,
+        ),
+      );
     }
+
     // Map by the method we asked for — a boleto transaction also carries a
     // `qr_code` (boleto híbrido), so field-sniffing picks the wrong one.
     return {
       gatewayOrderId: order.id,
       gatewayChargeId: charge.id,
-      status: charge.status === "paid" ? "paid" : charge.status === "failed" ? "failed" : "pending",
+      status,
+      declineReason,
       pix:
         input.method === "PIX" && tx.qr_code
           ? { qrCode: tx.qr_code, qrCodeUrl: tx.qr_code_url, expiresAt: tx.expires_at ?? "" }
@@ -196,8 +217,9 @@ export class PagarmeGateway implements PaymentGateway {
         return {
           payment_method: "credit_card",
           credit_card: {
-            installments: input.installments ?? 1,
-            statement_descriptor: input.statementDescriptor ?? "DOACAO",
+            installments: Math.min(12, Math.max(1, Math.trunc(input.installments ?? 1))),
+            statement_descriptor: sanitizeDescriptor(input.statementDescriptor),
+            operation_type: "auth_and_capture",
             card_token: input.cardToken,
           },
           ...split,
@@ -217,7 +239,19 @@ export class PagarmeGateway implements PaymentGateway {
         interval: "month",
         interval_count: input.intervalMonths,
         billing_type: "prepaid",
-        customer: { name: input.customer.name, email: input.customer.email, document: input.customer.document, type: "individual" },
+        customer: {
+          name: input.customer.name,
+          email: input.customer.email,
+          type: "individual",
+          ...(input.customer.document?.replace(/\D/g, "")
+            ? {
+                document: input.customer.document.replace(/\D/g, ""),
+                document_type: input.customer.document.replace(/\D/g, "").length > 11 ? "CNPJ" : "CPF",
+              }
+            : {}),
+          ...(brPhones(input.customer.phone) ? { phones: brPhones(input.customer.phone) } : {}),
+          ...(input.customer.address ? { address: pagarmeAddress(input.customer.address) } : {}),
+        },
         card_token: input.cardToken,
         items: [{ description: "Doação recorrente", quantity: 1, pricing_scheme: { price: input.amountCents } }],
         ...(input.split.length ? { split: input.split } : {}),
@@ -292,6 +326,49 @@ function isoInSeconds(seconds: number): string {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
+/**
+ * Pagar.me v5 requires `statement_descriptor` to be short and plain ASCII
+ * (`[A-Za-z0-9 ]`, ≤13). Org names with accents ("JL Serviços") or symbols
+ * would otherwise be rejected by the acquirer.
+ */
+const DIACRITICS = /[̀-ͯ]/g;
+
+function sanitizeDescriptor(raw: string | undefined, fallback = "DOACAO"): string {
+  const cleaned = (raw ?? "")
+    .normalize("NFD")
+    .replace(DIACRITICS, "")
+    .replace(/[^A-Za-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 13)
+    .trim();
+  return cleaned.length >= 1 ? cleaned : fallback;
+}
+
+/** `CreateOrderInput` address → Pagar.me v5 `customer.address` / billing shape. */
+function pagarmeAddress(a: NonNullable<CreateOrderInput["customer"]["address"]>) {
+  return {
+    line_1: a.line1,
+    ...(a.line2 ? { line_2: a.line2 } : {}),
+    zip_code: a.zipCode.replace(/\D/g, ""),
+    city: a.city,
+    state: a.state.toUpperCase().slice(0, 2),
+    country: (a.country ?? "BR").toUpperCase().slice(0, 2),
+  };
+}
+
+/** Best-effort human explanation for a failed charge, from the nested transaction. */
+function extractDecline(tx: PagarmeTransaction): string | undefined {
+  const fromErrors = (tx.gateway_response?.errors ?? [])
+    .map((e) => e?.message)
+    .filter((m): m is string => Boolean(m))
+    .join("; ");
+  if (tx.acquirer_message?.trim()) return tx.acquirer_message;
+  if (fromErrors) return fromErrors;
+  if (tx.status) return `status ${tx.status}`;
+  return undefined;
+}
+
 /** Pagar.me v5 `customer.phones` from a raw BR phone string. Pix/boleto require it. */
 function brPhones(raw: string | undefined): { mobile_phone: { country_code: string; area_code: string; number: string } } | null {
   const digits = (raw ?? "").replace(/\D/g, "").replace(/^55/, "");
@@ -302,20 +379,25 @@ function brPhones(raw: string | undefined): { mobile_phone: { country_code: stri
 }
 
 // ── Minimal shapes of the Pagar.me responses we read ──
+interface PagarmeTransaction {
+  status?: string;
+  acquirer_message?: string;
+  gateway_response?: { code?: string; errors?: Array<{ message?: string }> };
+  qr_code?: string;
+  qr_code_url?: string;
+  expires_at?: string;
+  line?: string;
+  barcode?: string;
+  pdf?: string;
+  url?: string;
+  due_at?: string;
+}
+
 interface PagarmeOrder {
   id: string;
   charges?: Array<{
     id: string;
     status: string;
-    last_transaction?: {
-      qr_code?: string;
-      qr_code_url?: string;
-      expires_at?: string;
-      line?: string;
-      barcode?: string;
-      pdf?: string;
-      url?: string;
-      due_at?: string;
-    };
+    last_transaction?: PagarmeTransaction;
   }>;
 }

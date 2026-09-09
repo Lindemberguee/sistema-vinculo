@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import { createBroadcast } from "@/server/crm/broadcasts";
-import { Field, Input, Textarea, Select, Button } from "@/components/ui";
+import { Field, Input, Textarea, Select, Button, useConfirm } from "@/components/ui";
 
 export interface SegmentOption {
   /** stable key */
@@ -29,6 +29,7 @@ export function BroadcastComposer({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const { confirm, dialog } = useConfirm();
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("Olá, {nome}!\n\n");
@@ -48,8 +49,14 @@ export function BroadcastComposer({
   const submit = (mode: "draft" | "send" | "schedule") =>
     start(async () => {
       setErr(null);
-      if (mode === "send" && !confirm(`Enviar para ${preview?.recipientCount ?? 0} doador(es)? Não dá para desfazer.`))
-        return;
+      if (mode === "send") {
+        const ok = await confirm({
+          title: `Enviar para ${preview?.recipientCount ?? 0} doador(es)?`,
+          description: "O envio começa imediatamente e não pode ser desfeito.",
+          confirmLabel: "Enviar agora",
+        });
+        if (!ok) return;
+      }
       if (mode === "schedule" && !scheduledAt) {
         setErr("Escolha a data e a hora do envio.");
         return;
@@ -114,12 +121,17 @@ export function BroadcastComposer({
                 onChange={(e) => setScheduledAt(e.target.value)}
               />
             </Field>
-            {err && <p className="field-error">{err}</p>}
+            {err && (
+              <p className="field-error" role="alert">
+                {err}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-3">
               {scheduledAt ? (
                 <Button
                   type="button"
-                  disabled={pending || subject.trim().length < 3 || body.trim().length < 5}
+                  loading={pending}
+                  disabled={subject.trim().length < 3 || body.trim().length < 5}
                   onClick={() => submit("schedule")}
                 >
                   {pending ? "Agendando…" : `Agendar para ${preview.recipientCount}`}
@@ -127,20 +139,16 @@ export function BroadcastComposer({
               ) : (
                 <Button
                   type="button"
-                  disabled={pending || subject.trim().length < 3 || body.trim().length < 5}
+                  loading={pending}
+                  disabled={subject.trim().length < 3 || body.trim().length < 5}
                   onClick={() => submit("send")}
                 >
                   {pending ? "Enviando…" : `Enviar para ${preview.recipientCount}`}
                 </Button>
               )}
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => submit("draft")}
-                className="text-sm font-medium text-muted hover:text-ink"
-              >
+              <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => submit("draft")}>
                 Salvar rascunho
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -171,6 +179,7 @@ export function BroadcastComposer({
           )}
         </div>
       </aside>
+      {dialog}
     </div>
   );
 }

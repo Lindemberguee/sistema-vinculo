@@ -15,6 +15,15 @@ const bodySchema = z
     method: z.enum(["PIX", "CREDIT_CARD", "BOLETO"]),
     cardToken: z.string().min(4).optional(),
     installments: z.number().int().min(1).max(12).optional(),
+    billingAddress: z
+      .object({
+        line1: z.string().min(3).max(160),
+        line2: z.string().max(160).optional(),
+        zipCode: z.string().regex(/^\d{8}$/),
+        city: z.string().min(2).max(80),
+        state: z.string().regex(/^[A-Za-z]{2}$/),
+      })
+      .optional(),
     tipCents: z.number().int().nonnegative().max(100_000_00).default(0),
     anonymous: z.boolean().default(false),
     donor: z.object({
@@ -46,8 +55,20 @@ export async function POST(req: Request, ctx: { params: Promise<{ raffleId: stri
     return NextResponse.json({ error: "validation_error", details: parsed.error.flatten() }, { status: 422 });
   }
   const input = parsed.data;
-  if (input.method === "CREDIT_CARD" && !input.cardToken) {
-    return NextResponse.json({ error: "card_token_required" }, { status: 422 });
+  if (input.method === "CREDIT_CARD") {
+    if (!input.cardToken) return NextResponse.json({ error: "card_token_required" }, { status: 422 });
+    if (!input.billingAddress) {
+      return NextResponse.json(
+        { error: "billing_address_required", message: "Endereço de cobrança é obrigatório para cartão." },
+        { status: 422 },
+      );
+    }
+    if (!input.donor.phone || input.donor.phone.replace(/\D/g, "").length < 10) {
+      return NextResponse.json(
+        { error: "phone_required", message: "Telefone com DDD é obrigatório para pagamento com cartão." },
+        { status: 422 },
+      );
+    }
   }
 
   try {
@@ -59,6 +80,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ raffleId: stri
       method: input.method,
       cardToken: input.cardToken,
       installments: input.installments,
+      billingAddress: input.billingAddress,
       tipCents: input.tipCents,
       anonymous: input.anonymous,
       donor: input.donor,

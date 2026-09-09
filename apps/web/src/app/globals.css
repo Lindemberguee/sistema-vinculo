@@ -330,6 +330,13 @@
       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/15
       disabled:cursor-not-allowed disabled:bg-canvas disabled:opacity-70;
   }
+  /* Compact variant for dense tables / inline row editors. Use `input input-sm`. */
+  .input-sm {
+    min-height: 2.25rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8125rem;
+  }
+
   /* Field marks its wrapper; the control inside picks up the state colour. */
   label[data-invalid] .input,
   label[data-invalid] .input:focus {

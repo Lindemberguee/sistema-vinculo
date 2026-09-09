@@ -234,7 +234,7 @@ function BarChart({ data, labels }: { data: number[]; labels: string[] }) {
         {data.map((v, i) => (
           <div key={`${labels[i]}-${i}`} className="group flex min-w-0 flex-1 flex-col items-center gap-2">
             <div title={`${labels[i]} · ${formatBRL(v)}`} className="w-full rounded-t bg-brand-600/80 transition-colors group-hover:bg-brand-600" style={{ height: `${Math.max(4, (v / max) * 100)}%` }} />
-            {i % 5 === 0 && <span className="text-[0.65rem] text-faint">{labels[i]}</span>}
+            {i % 5 === 0 && <span className="text-3xs text-faint">{labels[i]}</span>}
           </div>
         ))}
       </div>

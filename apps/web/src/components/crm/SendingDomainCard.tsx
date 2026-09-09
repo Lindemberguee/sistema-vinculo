@@ -9,7 +9,7 @@ import {
   refreshSendingDomain,
   verifySendingDomain,
 } from "@/server/org/sending-domain";
-import { Card, CardBody, Field, Input, Button, cn } from "@/components/ui";
+import { Card, CardBody, Field, Input, Button, useConfirm, cn } from "@/components/ui";
 
 interface DnsRecord {
   type: string;
@@ -41,6 +41,7 @@ export function SendingDomainCard({
   const [addState, addAction, adding] = useActionState(addSendingDomain.bind(null, orgId), null);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     if (addState?.ok) router.refresh();
@@ -85,10 +86,14 @@ export function SendingDomainCard({
               <Field label="1. Seu subdomínio de envio" hint="Ex.: mail.suaong.org.br — use um subdomínio, não o domínio raiz.">
                 <Input name="domain" placeholder="mail.suaong.org.br" className="w-64" required />
               </Field>
-              <Button type="submit" size="sm" disabled={adding}>
+              <Button type="submit" size="sm" loading={adding}>
                 {adding ? "Adicionando…" : "Adicionar domínio"}
               </Button>
-              {addState?.error && <p className="field-error w-full">{addState.error}</p>}
+              {addState?.error && (
+                <p className="field-error w-full" role="alert">
+                  {addState.error}
+                </p>
+              )}
             </form>
           </div>
         ) : verified ? (
@@ -175,7 +180,12 @@ export function SendingDomainCard({
             </details>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" disabled={pending} onClick={() => run(() => verifySendingDomain(orgId))}>
+              <Button
+                type="button"
+                size="sm"
+                loading={pending}
+                onClick={() => run(() => verifySendingDomain(orgId))}
+              >
                 {pending ? "Verificando…" : "Já publiquei — verificar"}
               </Button>
               <Button
@@ -187,19 +197,33 @@ export function SendingDomainCard({
               >
                 Atualizar status
               </Button>
-              <button
+              <Button
                 type="button"
+                size="sm"
+                variant="ghost"
                 disabled={pending}
-                onClick={() => confirm("Remover o domínio de envio?") && run(() => deleteSendingDomain(orgId))}
-                className="text-xs text-muted hover:text-danger"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: "Remover o domínio de envio?",
+                    description: "Os e-mails voltam a sair pelo domínio da plataforma.",
+                    confirmLabel: "Remover",
+                    tone: "danger",
+                  });
+                  if (ok) run(() => deleteSendingDomain(orgId));
+                }}
               >
                 Remover
-              </button>
-              {msg && <span className="field-error">{msg}</span>}
+              </Button>
+              {msg && (
+                <span className="field-error" role="alert">
+                  {msg}
+                </span>
+              )}
             </div>
           </div>
         )}
       </CardBody>
+      {dialog}
     </Card>
   );
 }

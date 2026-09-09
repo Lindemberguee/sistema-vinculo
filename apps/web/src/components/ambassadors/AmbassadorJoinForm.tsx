@@ -78,9 +78,13 @@ export function AmbassadorJoinForm({
         </Field>
       </div>
 
-      {state?.error && !state.ok && <p className="field-error">{state.error}</p>}
+      {state?.error && !state.ok && (
+        <p className="field-error" role="alert">
+          {state.error}
+        </p>
+      )}
 
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" loading={pending}>
         {pending ? "Criando…" : "Criar minha página"}
       </Button>
     </form>

@@ -75,35 +75,40 @@ export function renderStaticBlock(block: Block, ctx: StaticCtx): ReactNode {
   const cta = `mt-4 inline-block ${btn}`;
 
   switch (block.type) {
-    case "hero":
+    case "hero": {
+      const hasImg = Boolean(block.props.backgroundImageUrl);
+      const o = Math.max(0.35, block.props.overlay);
       return (
         <section
-          className="relative bg-cover bg-center px-6 py-20 text-center"
+          id="top"
+          className={`relative overflow-hidden bg-cover bg-center px-5 py-20 text-center sm:px-6 sm:py-28 ${
+            hasImg ? "text-white" : ""
+          }`}
           style={{
-            color: block.props.backgroundImageUrl ? "#fff" : undefined,
-            backgroundImage: block.props.backgroundImageUrl ? `url(${block.props.backgroundImageUrl})` : undefined,
+            backgroundImage: hasImg ? `url(${block.props.backgroundImageUrl})` : undefined,
+            background: hasImg ? undefined : a.wash,
           }}
         >
-          {block.props.backgroundImageUrl &&
-            (() => {
-              // Scrim gradient (heavier top/bottom) instead of a flat veil, so faces
-              // aren't washed out; floor at 0.35 for title legibility.
-              const o = Math.max(0.35, block.props.overlay);
-              return (
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: `linear-gradient(180deg, rgba(0,0,0,${o}) 0%, rgba(0,0,0,${(o * 0.55).toFixed(2)}) 50%, rgba(0,0,0,${o}) 100%)`,
-                  }}
-                />
-              );
-            })()}
+          {hasImg && (
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(180deg, rgba(0,0,0,${o}) 0%, rgba(0,0,0,${(o * 0.5).toFixed(2)}) 45%, rgba(0,0,0,${o}) 100%)`,
+              }}
+            />
+          )}
           <div className="relative mx-auto max-w-2xl">
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{block.props.title}</h1>
-            {block.props.subtitle && <p className="mt-2 text-lg opacity-90">{block.props.subtitle}</p>}
+            <h1 className="text-3xl font-semibold leading-[1.1] tracking-tight sm:text-[2.75rem]">
+              {block.props.title}
+            </h1>
+            {block.props.subtitle && (
+              <p className={`mt-3 text-lg leading-relaxed ${hasImg ? "text-white/90" : "text-muted"}`}>
+                {block.props.subtitle}
+              </p>
+            )}
             <a
               href={block.props.ctaTarget === "url" ? (block.props.ctaUrl ?? "#checkout") : "#checkout"}
-              className={cta}
+              className={`${cta} shadow-sm`}
               style={{ background: accent, color: fg }}
             >
               {block.props.ctaLabel}
@@ -111,6 +116,7 @@ export function renderStaticBlock(block: Block, ctx: StaticCtx): ReactNode {
           </div>
         </section>
       );
+    }
 
     case "richText":
       return (
@@ -160,48 +166,71 @@ export function renderStaticBlock(block: Block, ctx: StaticCtx): ReactNode {
     case "progressBar": {
       const { raisedCents, goalCents, donorsCount } = ctx;
       const pct = goalCents ? Math.min(100, Math.round((raisedCents / goalCents) * 100)) : null;
+      const remaining = goalCents ? Math.max(0, goalCents - raisedCents) : 0;
+      const barColor = block.props.accentColor ?? accent;
       return (
-        <div className="mx-auto max-w-2xl px-6 py-6">
+        <div className="mx-auto max-w-2xl px-5 py-8 sm:px-6">
+          {block.props.showValues && (
+            <div className="mb-2 flex items-end justify-between gap-3">
+              <p className="text-xl font-semibold tracking-tight tabular-nums sm:text-2xl">
+                {brl(raisedCents)}
+                {goalCents ? (
+                  <span className="ml-1 text-sm font-normal text-muted">de {brl(goalCents)}</span>
+                ) : null}
+              </p>
+              {pct !== null && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+                  style={{ background: a.wash, color: ink }}
+                >
+                  {pct}%
+                </span>
+              )}
+            </div>
+          )}
           {pct !== null && (
-            <div className="h-3 overflow-hidden rounded-full bg-line">
+            <div className="h-2.5 overflow-hidden rounded-full bg-line">
               <div
                 className="h-full rounded-full animate-progress-fill"
-                style={{ width: `${pct}%`, background: block.props.accentColor ?? accent }}
+                style={{ width: `${pct}%`, background: barColor }}
               />
             </div>
           )}
-          {block.props.showValues && (
-            <p className="mt-2 font-semibold">
-              {brl(raisedCents)}
-              {goalCents ? <span className="font-normal text-muted"> de {brl(goalCents)}</span> : null}
-            </p>
-          )}
-          {block.props.showDonorsCount && <p className="text-sm text-muted">{donorsCount} pessoas já doaram</p>}
+          <div className="mt-2 flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm text-muted">
+            {block.props.showDonorsCount && <span>{donorsCount.toLocaleString("pt-BR")} pessoas já doaram</span>}
+            {pct !== null && remaining > 0 && (
+              <span>
+                Faltam <span className="font-medium text-ink">{brl(remaining)}</span>
+              </span>
+            )}
+          </div>
         </div>
       );
     }
 
     case "amountOptions":
       return (
-        <div className="mx-auto flex max-w-xl flex-wrap justify-center gap-2 px-6 py-8">
-          {block.props.amountsCents.map((c, i) => (
-            <span
-              key={i}
-              className="rounded-full border px-4 py-2 text-sm font-medium"
-              style={
-                i === block.props.defaultIndex
-                  ? { borderColor: accent, color: ink, background: a.wash }
-                  : { borderColor: "var(--color-line-strong)", color: "var(--color-muted)" }
-              }
-            >
-              {brl(c)}
-            </span>
-          ))}
-          {block.props.allowCustom && (
-            <span className="rounded-full border border-dashed border-line-strong px-4 py-2 text-sm text-faint">
-              Outro valor
-            </span>
-          )}
+        <div className="mx-auto max-w-md px-5 py-8 sm:px-6">
+          <div className="grid grid-cols-3 gap-2">
+            {block.props.amountsCents.map((c, i) => (
+              <span
+                key={i}
+                className="grid min-h-12 place-items-center rounded-xl border px-2 text-sm font-semibold tabular-nums"
+                style={
+                  i === block.props.defaultIndex
+                    ? { borderColor: accent, color: ink, background: a.wash }
+                    : { borderColor: "var(--color-line-strong)", color: "var(--color-ink)" }
+                }
+              >
+                {brl(c)}
+              </span>
+            ))}
+            {block.props.allowCustom && (
+              <span className="grid min-h-12 place-items-center rounded-xl border border-dashed border-line-strong px-2 text-sm text-faint">
+                Outro
+              </span>
+            )}
+          </div>
         </div>
       );
 
@@ -275,13 +304,23 @@ export function renderStaticBlock(block: Block, ctx: StaticCtx): ReactNode {
 
     case "faq":
       return (
-        <div className="mx-auto max-w-[680px] px-6 py-8">
-          {block.props.items.map((it, i) => (
-            <details key={i} className="border-b border-line py-3">
-              <summary className="cursor-pointer font-medium">{it.q || "Pergunta"}</summary>
-              <p className="mt-1 text-muted">{it.a}</p>
-            </details>
-          ))}
+        <div className="mx-auto max-w-[680px] px-5 py-10 sm:px-6">
+          <div className="divide-y divide-line rounded-2xl border border-line">
+            {block.props.items.map((it, i) => (
+              <details key={i} className="group px-4 py-3.5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium marker:hidden [&::-webkit-details-marker]:hidden">
+                  <span>{it.q || "Pergunta"}</span>
+                  <span
+                    className="shrink-0 text-lg leading-none text-faint transition-transform duration-200 group-open:rotate-45"
+                    aria-hidden
+                  >
+                    +
+                  </span>
+                </summary>
+                <p className="mt-2 leading-relaxed text-muted">{it.a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       );
 

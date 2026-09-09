@@ -52,6 +52,7 @@ export class MockGateway implements PaymentGateway {
       gatewayOrderId,
       gatewayChargeId,
       status,
+      declineReason: status === "failed" ? "Cartão recusado (simulado)" : undefined,
       pix:
         input.method === "PIX" && status === "pending"
           ? {

@@ -6,6 +6,7 @@ import {
   BYOG_FEE_CONFIG,
   calculateFees,
   type CreateOrderInput,
+  type PostalAddress,
 } from "@donation/payments";
 import { getOrgGateway } from "@/server/payments/resolve";
 import { emitOutboundEvent } from "@/server/webhooks/emit";
@@ -27,6 +28,14 @@ export interface CreateDonationParams {
   ambassadorId?: string;
   installments?: number;
   cardToken?: string;
+  /** Card/boleto billing address. `line1` is "number, street, neighborhood". */
+  billingAddress?: {
+    line1: string;
+    line2?: string;
+    zipCode: string;
+    city: string;
+    state: string;
+  };
   anonymous: boolean;
   message?: string;
   /** "Dedico esta doação a …" — only stored when the campaign enables it. */
@@ -157,6 +166,17 @@ export async function createDonation(params: CreateDonationParams) {
     config: BYOG_FEE_CONFIG,
   });
 
+  const billingAddress: PostalAddress | undefined = params.billingAddress
+    ? {
+        line1: params.billingAddress.line1,
+        line2: params.billingAddress.line2,
+        zipCode: params.billingAddress.zipCode.replace(/\D/g, ""),
+        city: params.billingAddress.city,
+        state: params.billingAddress.state.toUpperCase().slice(0, 2),
+        country: "BR",
+      }
+    : undefined;
+
   // Upsert donor within the org.
   const documentHash = params.donor.document
     ? createHash("sha256").update(params.donor.document.replace(/\D/g, "")).digest("hex")
@@ -218,6 +238,8 @@ export async function createDonation(params: CreateDonationParams) {
         name: params.donor.name,
         email: params.donor.email,
         document: params.donor.document?.replace(/\D/g, ""),
+        phone: params.donor.phone,
+        address: billingAddress,
       },
       cardToken: params.cardToken,
     });
@@ -228,6 +250,7 @@ export async function createDonation(params: CreateDonationParams) {
       donation: { id: planRow.id, status: "PENDING" as const, paymentDetails: null },
       fees,
       recurring: true as const,
+      declineReason: undefined as string | undefined,
     };
   }
 
@@ -266,10 +289,11 @@ export async function createDonation(params: CreateDonationParams) {
       email: params.donor.email,
       document: params.donor.document?.replace(/\D/g, ""),
       phone: params.donor.phone,
+      address: billingAddress,
     },
     cardToken: params.cardToken,
     installments: params.installments,
-    statementDescriptor: org.displayName.slice(0, 13),
+    statementDescriptor: org.displayName,
     expiresInSeconds: params.method === "BOLETO" ? 3 * 24 * 3600 : 3600,
     metadata: { ...params.metadata, donationId, organizationId: org.id, campaignId: campaign.id },
   };
@@ -411,5 +435,10 @@ export async function createDonation(params: CreateDonationParams) {
     }
   }
 
-  return { donation, fees, recurring: Boolean(recurringPlanId) };
+  return {
+    donation,
+    fees,
+    recurring: Boolean(recurringPlanId),
+    declineReason: order.status === "failed" ? (order.declineReason ?? "Pagamento não autorizado.") : undefined,
+  };
 }

@@ -39,6 +39,24 @@ export interface SplitLeg {
   };
 }
 
+/**
+ * Billing / holder address. Required by the acquirer for credit-card charges
+ * (Pagar.me returns `validation_error | billing | "value" is required` without
+ * it) and by the bank for boleto. `line1` is a free-form
+ * "number, street, neighborhood" string.
+ */
+export interface PostalAddress {
+  line1: string;
+  line2?: string;
+  /** Digits only. */
+  zipCode: string;
+  city: string;
+  /** 2-letter BR state code (UF). */
+  state: string;
+  /** ISO-3166 alpha-2. Defaults to "BR". */
+  country?: string;
+}
+
 export interface CreateOrderInput {
   /** Our Donation id — also the gateway idempotency key. */
   donationId: string;
@@ -51,6 +69,8 @@ export interface CreateOrderInput {
     email: string;
     document?: string; // CPF/CNPJ, digits only
     phone?: string;
+    /** Sent as `customer.address`; also used as the acquirer billing address. */
+    address?: PostalAddress;
   };
   /** Card payments: single-use token from the browser SDK. Never a raw PAN. */
   cardToken?: string;
@@ -65,6 +85,8 @@ export interface OrderResult {
   gatewayOrderId: string;
   gatewayChargeId: string;
   status: "pending" | "paid" | "failed";
+  /** Acquirer/gateway explanation when `status === "failed"` (raw, for logs + mapping). */
+  declineReason?: string;
   pix?: { qrCode: string; qrCodeUrl?: string; expiresAt: string };
   boleto?: { line: string; pdfUrl: string; dueAt: string };
 }
@@ -74,7 +96,7 @@ export interface CreateSubscriptionInput {
   amountCents: Cents;
   intervalMonths: number;
   split: SplitLeg[];
-  customer: { name: string; email: string; document?: string };
+  customer: { name: string; email: string; document?: string; phone?: string; address?: PostalAddress };
   cardToken: string;
 }
 

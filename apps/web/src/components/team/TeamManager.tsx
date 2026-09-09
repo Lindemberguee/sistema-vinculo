@@ -10,7 +10,7 @@ import {
   resendInvitation,
   type TeamResult,
 } from "@/server/team/actions";
-import { Field, Input, Select, Button, Badge, Card, CardBody } from "@/components/ui";
+import { Field, Input, Select, Button, Badge, Card, CardBody, useConfirm } from "@/components/ui";
 
 const ROLES = ["OWNER", "ADMIN", "FINANCE", "EDITOR", "VIEWER"] as const;
 type Role = (typeof ROLES)[number];
@@ -70,7 +70,11 @@ export function TeamManager({
       <Card>
         <CardBody>
           <h2 className="text-sm font-semibold">Convidar alguém</h2>
-          <form key={nonce} action={inviteAction} className="mt-3 grid gap-3 sm:grid-cols-[1fr_180px_auto] sm:items-end">
+          <form
+            key={nonce}
+            action={inviteAction}
+            className="mt-3 grid gap-3 sm:grid-cols-[1fr_180px_auto] sm:items-start"
+          >
             <Field label="E-mail" error={inviteState?.fieldErrors?.email?.[0]}>
               <Input name="email" type="email" required placeholder="pessoa@exemplo.com" />
             </Field>
@@ -83,12 +87,20 @@ export function TeamManager({
                 ))}
               </Select>
             </Field>
-            <Button type="submit" disabled={inviting}>
+            <Button type="submit" loading={inviting} className="sm:mt-6">
               {inviting ? "Enviando…" : "Enviar convite"}
             </Button>
           </form>
-          {inviteState?.error && <p className="field-error mt-2">{inviteState.error}</p>}
-          {inviteState?.ok && <p className="mt-2 text-sm text-success">Convite enviado.</p>}
+          {inviteState?.error && (
+            <p className="field-error mt-2" role="alert">
+              {inviteState.error}
+            </p>
+          )}
+          {inviteState?.ok && (
+            <p className="mt-2 text-sm text-success" role="status" aria-live="polite">
+              Convite enviado.
+            </p>
+          )}
         </CardBody>
       </Card>
 
@@ -142,6 +154,8 @@ function MemberRow({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState(m.role);
+  const { confirm, dialog } = useConfirm();
 
   function run(fn: () => Promise<TeamResult>) {
     start(async () => {
@@ -152,44 +166,74 @@ function MemberRow({
     });
   }
 
+  const roleOptions = [...new Set([m.role as Role, ...assignableRoles])];
+
+  async function onRoleChange(next: string) {
+    if (next === m.role) return;
+    const ok = await confirm({
+      title: `Mudar função de ${m.name}?`,
+      description: `De ${ROLE_LABEL[m.role as Role] ?? m.role} para ${ROLE_LABEL[next as Role] ?? next}. O acesso muda na hora.`,
+      confirmLabel: "Mudar função",
+    });
+    if (!ok) {
+      setRole(m.role);
+      return;
+    }
+    setRole(next);
+    run(() => changeMemberRole(orgId, m.id, next as Role));
+  }
+
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-3">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{m.name}</span>
           {isSelf && <Badge tone="neutral">você</Badge>}
         </div>
         <div className="truncate text-xs text-muted">{m.email}</div>
-        {error && <div className="field-error mt-0.5">{error}</div>}
+        {error && (
+          <div className="field-error mt-0.5" role="alert">
+            {error}
+          </div>
+        )}
       </div>
       {canManage ? (
         <>
           <select
-            className="input h-8 w-auto py-0 text-xs"
-            defaultValue={m.role}
+            aria-label={`Função de ${m.name}`}
+            className="input input-sm w-auto"
+            value={role}
             disabled={pending}
-            onChange={(e) => run(() => changeMemberRole(orgId, m.id, e.target.value as Role))}
+            onChange={(e) => onRoleChange(e.target.value)}
           >
-            {[...new Set([m.role as Role, ...assignableRoles])].map((r) => (
+            {roleOptions.map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r as Role] ?? r}
               </option>
             ))}
           </select>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             disabled={pending}
-            onClick={() => {
-              if (confirm(`Remover ${m.name} da equipe?`)) run(() => removeMember(orgId, m.id));
+            onClick={async () => {
+              const ok = await confirm({
+                title: `Remover ${m.name} da equipe?`,
+                description: "A pessoa perde o acesso a esta organização imediatamente.",
+                confirmLabel: "Remover",
+                tone: "danger",
+              });
+              if (ok) run(() => removeMember(orgId, m.id));
             }}
-            className="text-xs font-medium text-danger hover:underline"
           >
             Remover
-          </button>
+          </Button>
         </>
       ) : (
         <span className="text-xs text-muted">{ROLE_LABEL[m.role as Role] ?? m.role}</span>
       )}
+      {dialog}
     </li>
   );
 }
@@ -197,6 +241,7 @@ function MemberRow({
 function InviteRow({ orgId, i }: { orgId: string; i: Invite }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const { confirm, dialog } = useConfirm();
 
   function run(fn: () => Promise<TeamResult>) {
     start(async () => {
@@ -206,29 +251,40 @@ function InviteRow({ orgId, i }: { orgId: string; i: Invite }) {
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-3">
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{i.email}</div>
         <div className="text-xs text-muted">
           {ROLE_LABEL[i.role as Role] ?? i.role} · expira em {i.expiresAt}
         </div>
       </div>
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         disabled={pending}
         onClick={() => run(() => resendInvitation(orgId, i.id))}
-        className="text-xs font-medium text-brand-600 hover:underline"
       >
         Reenviar
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         disabled={pending}
-        onClick={() => run(() => revokeInvitation(orgId, i.id))}
-        className="text-xs font-medium text-muted hover:text-danger hover:underline"
+        onClick={async () => {
+          const ok = await confirm({
+            title: "Revogar convite?",
+            description: `O link enviado para ${i.email} deixa de funcionar.`,
+            confirmLabel: "Revogar",
+            tone: "danger",
+          });
+          if (ok) run(() => revokeInvitation(orgId, i.id));
+        }}
       >
         Revogar
-      </button>
+      </Button>
+      {dialog}
     </li>
   );
 }

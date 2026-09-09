@@ -13,6 +13,7 @@ export interface EventOrderParams {
   method: PaymentMethod;
   cardToken?: string;
   installments?: number;
+  billingAddress?: { line1: string; line2?: string; zipCode: string; city: string; state: string };
   tipCents: number;
   donor: { name: string; email: string; document?: string; phone?: string };
   consent: { email: boolean; whatsapp: boolean };
@@ -129,10 +130,20 @@ export async function createEventOrder(params: EventOrderParams) {
       email: params.donor.email,
       document: params.donor.document?.replace(/\D/g, ""),
       phone: params.donor.phone,
+      address: params.billingAddress
+        ? {
+            line1: params.billingAddress.line1,
+            line2: params.billingAddress.line2,
+            zipCode: params.billingAddress.zipCode.replace(/\D/g, ""),
+            city: params.billingAddress.city,
+            state: params.billingAddress.state.toUpperCase().slice(0, 2),
+            country: "BR",
+          }
+        : undefined,
     },
     cardToken: params.cardToken,
     installments: params.installments,
-    statementDescriptor: org.displayName.slice(0, 13),
+    statementDescriptor: org.displayName,
     expiresInSeconds: params.method === "BOLETO" ? 3 * 24 * 3600 : 3600,
     metadata: { kind: "event", eventId: event.id, donationId, organizationId: org.id },
   };

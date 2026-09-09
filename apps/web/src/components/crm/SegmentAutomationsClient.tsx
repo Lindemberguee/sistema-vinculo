@@ -8,7 +8,7 @@ import {
   sendAnnualStatements,
   toggleSegmentAutomation,
 } from "@/server/crm/segment-automations";
-import { Field, Input, Select, Button, Badge } from "@/components/ui";
+import { Field, Input, Select, Button, Badge, useConfirm } from "@/components/ui";
 
 interface Opt {
   value: string;
@@ -27,9 +27,11 @@ export function AnnualStatementCard({ orgId, years }: { orgId: string; years: nu
   const [year, setYear] = useState(years[0]!);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   return (
     <div className="card space-y-3 p-4">
+      {dialog}
       <div>
         <h2 className="text-sm font-semibold">Informe anual de doações</h2>
         <p className="mt-1 text-xs text-muted">
@@ -52,20 +54,37 @@ export function AnnualStatementCard({ orgId, years }: { orgId: string; years: nu
           type="button"
           variant="secondary"
           size="sm"
-          disabled={pending}
+          loading={pending}
           onClick={() =>
             start(async () => {
               setMsg(null);
-              if (!confirm(`Enviar o informe anual de ${year} para os doadores desse ano?`)) return;
+              const ok = await confirm({
+                title: `Enviar o informe anual de ${year}?`,
+                description: "Vai para todos os doadores desse ano que consentiram receber e-mails.",
+                confirmLabel: "Enviar",
+              });
+              if (!ok) return;
               const r = await sendAnnualStatements(orgId, year);
-              setMsg(r.ok ? { ok: true, text: "Disparo iniciado. Os e-mails saem em instantes." } : { ok: false, text: r.error ?? "Falha" });
+              setMsg(
+                r.ok
+                  ? { ok: true, text: "Disparo iniciado. Os e-mails saem em instantes." }
+                  : { ok: false, text: r.error ?? "Falha" },
+              );
             })
           }
         >
           {pending ? "Enviando…" : "Enviar agora"}
         </Button>
       </div>
-      {msg && <p className={msg.ok ? "text-xs font-medium text-success" : "field-error"}>{msg.text}</p>}
+      {msg && (
+        <p
+          className={msg.ok ? "text-xs font-medium text-success" : "field-error"}
+          role={msg.ok ? "status" : "alert"}
+          aria-live="polite"
+        >
+          {msg.text}
+        </p>
+      )}
     </div>
   );
 }
@@ -135,10 +154,14 @@ export function SegmentAutomationForm({
           onChange={(e) => setDelayDays(Math.max(0, Math.min(90, Number(e.target.value) || 0)))}
         />
       </Field>
-      <Button type="submit" size="sm" disabled={pending}>
-        {pending ? "…" : "Criar gatilho"}
+      <Button type="submit" size="sm" loading={pending}>
+        {pending ? "Criando…" : "Criar gatilho"}
       </Button>
-      {err && <p className="field-error sm:col-span-4">{err}</p>}
+      {err && (
+        <p className="field-error sm:col-span-4" role="alert">
+          {err}
+        </p>
+      )}
     </form>
   );
 }
@@ -152,32 +175,51 @@ export function AutomationRowActions({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => {
+      setErr(null);
       const r = await fn();
       if (r.ok) router.refresh();
-      else alert(r.error ?? "Falha");
+      else setErr(r.error ?? "Falha");
     });
 
   return (
     <div className="flex items-center justify-end gap-2">
-      <button
+      {err && (
+        <span className="text-xs text-danger" role="alert">
+          {err}
+        </span>
+      )}
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         disabled={pending}
         onClick={() => run(() => toggleSegmentAutomation(orgId, row.id))}
-        className="text-xs font-medium text-brand-600 hover:underline"
       >
         {row.enabled ? "Pausar" : "Ativar"}
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         disabled={pending}
-        onClick={() => confirm("Excluir este gatilho?") && run(() => deleteSegmentAutomation(orgId, row.id))}
-        className="text-xs text-muted hover:text-danger"
+        onClick={async () => {
+          const ok = await confirm({
+            title: "Excluir este gatilho?",
+            description: `“${row.templateLabel}” para o segmento “${row.segmentName}” deixa de rodar.`,
+            confirmLabel: "Excluir",
+            tone: "danger",
+          });
+          if (ok) run(() => deleteSegmentAutomation(orgId, row.id));
+        }}
       >
         Excluir
-      </button>
+      </Button>
+      {dialog}
     </div>
   );
 }

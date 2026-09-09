@@ -11,6 +11,7 @@ import { CommunicationTab } from "@/components/campaign-editor/CommunicationTab"
 import { SettingsTab } from "@/components/campaign-editor/SettingsTab";
 import { LinksTab } from "@/components/campaign-editor/LinksTab";
 import { AmbassadorsTab } from "@/components/campaign-editor/AmbassadorsTab";
+import { CampaignTabNav } from "@/components/campaign-editor/CampaignTabNav";
 import { PublicLinkCard } from "@/components/panel/PublicLinkCard";
 import { orgPublicOrigin } from "@/server/links/url";
 import { PageHeader, LinkButton, cn } from "@/components/ui";
@@ -190,24 +191,11 @@ export default async function CampaignSettings({
         <CampaignStatusControls orgId={orgId} campaignId={campaignId} status={c.status} />
       </div>
 
-      <nav
-        aria-label="Configurações da campanha"
-        className="mb-5 flex gap-1 overflow-x-auto border-b border-line pb-px"
-      >
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={`/orgs/${orgId}/campaigns/${campaignId}?tab=${t.key}`}
-            aria-current={t.key === tab ? "page" : undefined}
-            className={cn(
-              "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
-              t.key === tab ? "border-brand-600 text-ink" : "border-transparent text-muted hover:text-ink",
-            )}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </nav>
+      <CampaignTabNav
+        tabs={TABS}
+        current={tab}
+        hrefFor={(key) => `/orgs/${orgId}/campaigns/${campaignId}?tab=${key}`}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0">
