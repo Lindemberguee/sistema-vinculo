@@ -3,7 +3,8 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { assertSafeOutboundUrl, isAppError, UnsafeUrlError, WEBHOOK_EVENTS } from "@donation/shared";
+import { isAppError, WEBHOOK_EVENTS } from "@donation/shared";
+import { assertSafeOutboundUrl, UnsafeUrlError } from "@donation/shared/ssrf";
 import { requireOrgAccess } from "@/server/auth-helpers";
 
 export interface WebhookResult {

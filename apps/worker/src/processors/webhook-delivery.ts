@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { prisma } from "@donation/db";
-import { assertSafeOutboundUrl, UnsafeUrlError } from "@donation/shared";
+import { assertSafeOutboundUrl, UnsafeUrlError } from "@donation/shared/ssrf";
 
 const TIMEOUT_MS = 10_000;
 const MAX_ATTEMPTS = 6;
