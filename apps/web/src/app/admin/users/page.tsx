@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@donation/db";
 import { requirePlatformAdminPage } from "@/server/admin-helpers";
 import { AdminResetPasswordForm } from "@/components/admin/AdminResetPasswordForm";
+import { appPanelOrigin } from "@/server/links/url";
 import { PageHeader, Card, CardBody, Table, Th, Td, Tr, Badge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -106,13 +107,6 @@ export default async function AdminUsersPage() {
       </Card>
     </main>
   );
-}
-
-function appPanelOrigin(): string {
-  const base = process.env.PUBLIC_APP_BASE_DOMAIN ?? process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-  const host = base.startsWith("app.") || base.includes("localhost") ? base : `app.${base}`;
-  const scheme = host.includes("localhost") ? "http" : "https";
-  return `${scheme}://${host}`;
 }
 
 function Kpi({ label, value, detail }: { label: string; value: string; detail: string }) {

@@ -3,6 +3,7 @@ import { prisma } from "@donation/db";
 import { formatBRL } from "@donation/shared";
 import { requirePlatformAdminPage } from "@/server/admin-helpers";
 import { AdminOrgActions } from "@/components/admin/AdminOrgRow";
+import { appPanelOrigin, orgPublicOrigin } from "@/server/links/url";
 import { PageHeader, Card, CardBody, Table, Th, Td, Tr, StatusBadge, Badge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,6 @@ const SUB_TONE: Record<string, "success" | "warn" | "danger" | "neutral"> = {
 export default async function AdminOrgs() {
   await requirePlatformAdminPage();
   const appOrigin = appPanelOrigin();
-  const publicBase = publicAppBaseDomain();
 
   const [orgs, plans, donationTotals] = await Promise.all([
     prisma.organization.findMany({
@@ -119,7 +119,7 @@ export default async function AdminOrgs() {
                       <AdminOrgActions orgId={o.id} planId={o.planId} orgStatus={o.status} plans={plans} />
                       <div className="mt-2 flex flex-wrap gap-2 text-xs">
                         <Link href={`${appOrigin}/orgs/${o.id}`} className="link">Abrir painel</Link>
-                        <Link href={`${publicOriginForOrg(o.slug, publicBase)}`} target="_blank" className="link">Site público</Link>
+                        <Link href={orgPublicOrigin({ slug: o.slug })} target="_blank" className="link">Site público</Link>
                       </div>
                     </Td>
                   </Tr>
@@ -131,22 +131,6 @@ export default async function AdminOrgs() {
       </Card>
     </main>
   );
-}
-
-function publicAppBaseDomain(): string {
-  return process.env.PUBLIC_APP_BASE_DOMAIN ?? process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-}
-
-function publicOriginForOrg(slug: string, base: string): string {
-  const scheme = base.includes("localhost") ? "http" : "https";
-  return `${scheme}://${slug}.${base}`;
-}
-
-function appPanelOrigin(): string {
-  const base = process.env.PUBLIC_APP_BASE_DOMAIN ?? process.env.APP_BASE_DOMAIN ?? "localhost:3000";
-  const host = base.startsWith("app.") || base.includes("localhost") ? base : `app.${base}`;
-  const scheme = host.includes("localhost") ? "http" : "https";
-  return `${scheme}://${host}`;
 }
 
 function Kpi({ label, value, detail }: { label: string; value: string; detail: string }) {
