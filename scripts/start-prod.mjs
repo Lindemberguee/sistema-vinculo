@@ -2,17 +2,25 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 
 const PORT = process.env.PORT || "3305";
-const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const isWin = process.platform === "win32";
+const pnpm = isWin ? "pnpm.cmd" : "pnpm";
 
 const children = new Map();
 let shuttingDown = false;
 
 function startProcess(name, args, env = {}) {
-  const child = spawn(pnpm, args, {
+  const opts = {
     cwd: process.cwd(),
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"],
-  });
+  };
+  // Node >=18.20.2 / 20.12.1 refuses to spawn a .cmd/.bat directly on Windows
+  // (CVE-2024-27980). Run it through the shell as a single command string —
+  // these args are all static, no user input, so plain concatenation is safe
+  // and avoids the DEP0190 "args + shell" warning.
+  const child = isWin
+    ? spawn([pnpm, ...args].join(" "), { ...opts, shell: true })
+    : spawn(pnpm, args, opts);
 
   children.set(name, child);
   prefixLines(name, child.stdout);
