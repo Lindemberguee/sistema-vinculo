@@ -11,11 +11,9 @@ import { cn } from "@/components/ui";
 export function CampaignTabNav({
   tabs,
   current,
-  hrefFor,
 }: {
-  tabs: readonly { key: string; label: string }[];
+  tabs: readonly { key: string; label: string; href: string }[];
   current: string;
-  hrefFor: (key: string) => string;
 }) {
   const ref = useRef<HTMLElement>(null);
 
@@ -34,7 +32,7 @@ export function CampaignTabNav({
       {tabs.map((t) => (
         <Link
           key={t.key}
-          href={hrefFor(t.key)}
+          href={t.href}
           aria-current={t.key === current ? "page" : undefined}
           className={cn(
             "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
