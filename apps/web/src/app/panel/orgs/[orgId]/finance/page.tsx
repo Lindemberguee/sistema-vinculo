@@ -23,7 +23,7 @@ export default async function FinancePage({ params }: { params: Promise<{ orgId:
     <>
       <PageHeader
         title="Finanças"
-        description="Acompanhe o que foi pago e o que o gateway ainda vai liberar para sua organização."
+        description="Acompanhe o que foi pago pelas doações e quanto ficou líquido para a sua organização."
       />
 
       <div className="space-y-4">
@@ -32,20 +32,19 @@ export default async function FinancePage({ params }: { params: Promise<{ orgId:
             { label: "Bruto arrecadado", value: formatBRL(f.grossCents) },
             { label: "Taxas do gateway", value: formatBRL(f.platformFeeCents) },
             { label: "Líquido recebido pela ONG", value: formatBRL(f.netCents) },
-            { label: "Repassado", value: formatBRL(f.paidOutCents) },
             { label: "Estornado", value: formatBRL(f.reversedCents) },
           ]}
         />
 
         <Card className="border-l-2 border-l-brand-500">
           <CardBody>
-            <div className="eyebrow">Saldo a repassar</div>
+            <div className="eyebrow">Líquido para a organização</div>
             <div className="mt-1 text-3xl font-semibold tabular-nums tracking-tight">
-              {formatBRL(f.balanceCents)}
+              {formatBRL(f.netAfterReversalsCents)}
             </div>
             <p className="mt-1 text-xs text-muted">
-              de {formatBRL(f.netCents)} líquidos no total · repasses são feitos pelo gateway conforme o prazo de
-              liberação.
+              de {formatBRL(f.netCents)} líquidos no total, já descontados {formatBRL(f.reversedCents)} em estornos · o
+              gateway conectado da sua organização repassa direto para a conta dela, conforme o prazo de liberação dele.
             </p>
           </CardBody>
         </Card>

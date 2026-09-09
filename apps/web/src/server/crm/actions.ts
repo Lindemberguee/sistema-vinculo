@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { isAppError } from "@donation/shared";
 import { requireOrgAccess } from "@/server/auth-helpers";
+import { assertModule } from "@/server/billing/limits";
 import { enqueueExport, enqueueRfm } from "@/server/queue";
 
 export interface CrmResult {
@@ -54,6 +55,7 @@ const tagSchema = z.string().trim().min(1).max(40);
 export async function addDonorTag(organizationId: string, donorId: string, rawTag: string): Promise<CrmResult> {
   try {
     const { db } = await requireOrgAccess(organizationId, "EDITOR");
+    await assertModule(organizationId, "crm");
     const tag = tagSchema.parse(rawTag);
 
     const donor = await db.donor.findFirst({ where: { id: donorId }, select: { id: true } });
@@ -90,6 +92,7 @@ export async function removeDonorTag(organizationId: string, donorId: string, ta
 export async function triggerRfm(organizationId: string): Promise<CrmResult> {
   try {
     await requireOrgAccess(organizationId, "FINANCE");
+    await assertModule(organizationId, "crm");
     await enqueueRfm(organizationId);
   } catch (err) {
     if (isAppError(err)) return { ok: false, error: err.message };

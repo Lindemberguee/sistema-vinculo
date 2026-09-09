@@ -6,6 +6,7 @@ import { isAppError } from "@donation/shared";
 import { SEGMENT_TRIGGER_KINDS, type EmailTemplateKind } from "@donation/emails";
 import { buildDonorWhere, parseDonorFilters } from "@donation/db";
 import { requireOrgAccess } from "@/server/auth-helpers";
+import { assertModule } from "@/server/billing/limits";
 import { enqueueAnnualStatements } from "@/server/queue";
 import type { CrmResult } from "./notes";
 
@@ -28,6 +29,7 @@ export async function createSegmentAutomation(
 ): Promise<CrmResult> {
   try {
     const { db, userId } = await requireOrgAccess(organizationId, "ADMIN");
+    await assertModule(organizationId, "crm");
     const parsed = ruleSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
 
@@ -137,6 +139,7 @@ const annualSchema = z.coerce.number().int().min(2020).max(new Date().getFullYea
 export async function sendAnnualStatements(organizationId: string, year: number): Promise<CrmResult> {
   try {
     await requireOrgAccess(organizationId, "ADMIN");
+    await assertModule(organizationId, "crm");
     const parsed = annualSchema.safeParse(year);
     if (!parsed.success) return { ok: false, error: "Ano inválido" };
     await enqueueAnnualStatements(parsed.data);

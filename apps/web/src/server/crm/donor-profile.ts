@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { isAppError } from "@donation/shared";
 import { requireOrgAccess } from "@/server/auth-helpers";
+import { assertModule } from "@/server/billing/limits";
 import type { CrmResult } from "./notes";
 
 const CHANNELS = ["EMAIL", "WHATSAPP", "PHONE", "SMS"] as const;
@@ -23,6 +24,7 @@ export async function updateDonorProfile(
 ): Promise<CrmResult> {
   try {
     const { db } = await requireOrgAccess(organizationId, "EDITOR");
+    await assertModule(organizationId, "crm");
     const donor = await db.donor.findFirst({ where: { id: donorId }, select: { id: true } });
     if (!donor) return { ok: false, error: "Doador não encontrado" };
 

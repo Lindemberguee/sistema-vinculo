@@ -7,8 +7,10 @@ export interface FinanceOverview {
   gatewayFeeCents: number;
   netCents: number; // netToOrgCents, PAID, BRL
   reversedCents: number; // net lost to refund / chargeback
-  paidOutCents: number; // Payout.status = PAID
-  balanceCents: number; // net - reversed - paidOut  (what still needs to reach the org)
+  // BYOG: the platform never holds or transfers funds — the org's own gateway
+  // settles straight to its account. So there is no "paid out" figure; this is
+  // just the net that has cleared, minus reversals.
+  netAfterReversalsCents: number;
   byOrigin: { title: string; netCents: number }[];
   recent: {
     id: string;
@@ -25,7 +27,7 @@ const BRL_PAID = (organizationId: string) =>
 
 /** Money overview for the Finanças page, scoped to one org. Read-only. */
 export async function getFinanceOverview(organizationId: string): Promise<FinanceOverview> {
-  const [paidAgg, reversedAgg, payoutAgg, originGroups, recentRows, intlGroups] = await withDbRetry(() =>
+  const [paidAgg, reversedAgg, originGroups, recentRows, intlGroups] = await withDbRetry(() =>
     Promise.all([
     prisma.donation.aggregate({
       where: BRL_PAID(organizationId),
@@ -35,7 +37,6 @@ export async function getFinanceOverview(organizationId: string): Promise<Financ
       where: { organizationId, currency: "BRL", status: { in: ["REFUNDED", "CHARGED_BACK"] } },
       _sum: { netToOrgCents: true },
     }),
-    prisma.payout.aggregate({ where: { organizationId, status: "PAID" }, _sum: { amountCents: true } }),
     prisma.donation.groupBy({
       by: ["campaignId"],
       where: BRL_PAID(organizationId),
@@ -69,7 +70,6 @@ export async function getFinanceOverview(organizationId: string): Promise<Financ
   const grossCents = (paidAgg._sum.amountCents ?? 0) + (paidAgg._sum.tipCents ?? 0);
   const netCents = paidAgg._sum.netToOrgCents ?? 0;
   const reversedCents = reversedAgg._sum.netToOrgCents ?? 0;
-  const paidOutCents = payoutAgg._sum.amountCents ?? 0;
 
   return {
     grossCents,
@@ -77,8 +77,7 @@ export async function getFinanceOverview(organizationId: string): Promise<Financ
     gatewayFeeCents: paidAgg._sum.gatewayFeeCents ?? 0,
     netCents,
     reversedCents,
-    paidOutCents,
-    balanceCents: Math.max(0, netCents - reversedCents - paidOutCents),
+    netAfterReversalsCents: Math.max(0, netCents - reversedCents),
     byOrigin: originGroups.map((g) => ({
       title: g.campaignId ? (titleById.get(g.campaignId) ?? "Campanha removida") : "Sem campanha",
       netCents: g._sum.netToOrgCents ?? 0,

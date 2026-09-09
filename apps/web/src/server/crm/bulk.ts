@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { isAppError } from "@donation/shared";
 import { requireOrgAccess } from "@/server/auth-helpers";
+import { assertModule } from "@/server/billing/limits";
 import type { CrmResult } from "./notes";
 
 const MAX = 300;
@@ -24,6 +25,7 @@ export async function bulkAssignOwner(
 ): Promise<CrmResult & { count?: number }> {
   try {
     const { db } = await requireOrgAccess(organizationId, "EDITOR");
+    await assertModule(organizationId, "crm");
     const ids = await scopedDonorIds(db, idList.parse(donorIds));
     if (ids.length === 0) return { ok: false, error: "Nenhum doador válido" };
 
@@ -53,6 +55,7 @@ export async function bulkAddTag(
 ): Promise<CrmResult & { count?: number }> {
   try {
     const { db } = await requireOrgAccess(organizationId, "EDITOR");
+    await assertModule(organizationId, "crm");
     const tag = z.string().trim().min(1).max(40).parse(rawTag);
     const ids = await scopedDonorIds(db, idList.parse(donorIds));
     if (ids.length === 0) return { ok: false, error: "Nenhum doador válido" };
@@ -82,6 +85,7 @@ export async function bulkCreateTask(
 ): Promise<CrmResult & { count?: number }> {
   try {
     const { db, userId } = await requireOrgAccess(organizationId, "EDITOR");
+    await assertModule(organizationId, "crm");
     const parsed = bulkTaskSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
     const ids = await scopedDonorIds(db, idList.parse(donorIds));

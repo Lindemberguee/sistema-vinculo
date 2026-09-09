@@ -6,6 +6,7 @@ import { z } from "zod";
 import { isAppError } from "@donation/shared";
 import { buildDonorWhere, parseDonorFilters } from "@donation/db";
 import { requireOrgAccess } from "@/server/auth-helpers";
+import { assertModule } from "@/server/billing/limits";
 import { enqueueBroadcast } from "@/server/queue";
 import type { CrmResult } from "./notes";
 
@@ -56,6 +57,7 @@ export async function createBroadcast(
   let created: { id: string } | null = null;
   try {
     const { db, userId } = await requireOrgAccess(organizationId, "ADMIN");
+    await assertModule(organizationId, "crm");
     const parsed = composeSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
 
@@ -97,6 +99,7 @@ export async function createBroadcast(
 export async function sendExistingBroadcast(organizationId: string, broadcastId: string): Promise<CrmResult> {
   try {
     const { db } = await requireOrgAccess(organizationId, "ADMIN");
+    await assertModule(organizationId, "crm");
     const b = await db.donorBroadcast.findFirst({
       where: { id: broadcastId, organizationId },
       select: { id: true, status: true, filters: true },
