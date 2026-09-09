@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { Labeled } from "./checkout-ui";
+import { resolveAccent } from "./accent";
 
 interface LotSeed {
   id: string;
@@ -71,11 +74,16 @@ export function AuctionLots({ lots: seed, columns, accent }: { lots: LotSeed[]; 
 }
 
 function LotCard({ lot, accent }: { lot: LotSeed; accent: string }) {
+  const pal = resolveAccent(accent);
   const [amount, setAmount] = useState("");
   const [donor, setDonor] = useState({ name: "", email: "" });
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [state, setState] = useState(lot);
+
+  // Keep in sync with the parent poll — without this the card is frozen on its
+  // first render for anyone who isn't the bidder.
+  useEffect(() => setState(lot), [lot]);
 
   const ended = state.status !== "ACTIVE" || new Date(state.endsAt).getTime() <= Date.now();
 
@@ -93,23 +101,36 @@ function LotCard({ lot, accent }: { lot: LotSeed; accent: string }) {
           consent: { email: true, whatsapp: false },
         }),
       });
-      const body = (await r.json()) as { currentBidCents?: number; minNextCents?: number; endsAt?: string; bidCount?: number; message?: string; error?: string };
+      const body = (await r.json()) as {
+        currentBidCents?: number;
+        minNextCents?: number;
+        endsAt?: string;
+        bidCount?: number;
+        message?: string;
+        error?: string;
+      };
       if (!r.ok) {
-        setMsg(body.message ?? body.error ?? "Não foi possível registrar o lance.");
+        setMsg({ tone: "err", text: body.message ?? body.error ?? "Não foi possível registrar o lance." });
       } else {
-        setState((s) => ({ ...s, currentBidCents: body.currentBidCents ?? s.currentBidCents, minNextCents: body.minNextCents ?? s.minNextCents, endsAt: body.endsAt ?? s.endsAt, bidCount: body.bidCount ?? s.bidCount }));
+        setState((s) => ({
+          ...s,
+          currentBidCents: body.currentBidCents ?? s.currentBidCents,
+          minNextCents: body.minNextCents ?? s.minNextCents,
+          endsAt: body.endsAt ?? s.endsAt,
+          bidCount: body.bidCount ?? s.bidCount,
+        }));
         setAmount("");
-        setMsg("Lance registrado! Você lidera este lote.");
+        setMsg({ tone: "ok", text: "Lance registrado! Você lidera este lote." });
       }
     } catch {
-      setMsg("Erro de rede.");
+      setMsg({ tone: "err", text: "Erro de rede." });
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface">
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
       {state.photoUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={state.photoUrl} alt={state.title} className="h-44 w-full object-cover" />
@@ -117,10 +138,10 @@ function LotCard({ lot, accent }: { lot: LotSeed; accent: string }) {
       <div className="p-4">
         <div className="font-semibold">{state.title}</div>
         <p className="mt-1 line-clamp-2 text-sm text-muted">{state.description}</p>
-        <div className="mt-3 flex items-baseline justify-between text-sm">
+        <div className="mt-3 flex items-baseline justify-between gap-3 text-sm">
           <div>
             <div className="text-xs text-muted">Lance atual</div>
-            <div className="text-lg font-semibold">
+            <div className="text-lg font-semibold tabular-nums">
               {state.currentBidCents ? brl(state.currentBidCents) : `a partir de ${brl(state.startPriceCents)}`}
             </div>
           </div>
@@ -132,24 +153,57 @@ function LotCard({ lot, accent }: { lot: LotSeed; accent: string }) {
         {ended ? (
           <p className="mt-3 text-sm text-muted">Este lote foi encerrado.</p>
         ) : (
-          <form onSubmit={bid} className="mt-3 grid gap-2">
-            <input
-              className="input"
-              inputMode="decimal"
-              placeholder={`Mínimo ${brl(state.minNextCents)}`}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+          <form onSubmit={bid} className="mt-3 grid gap-2.5">
+            <Labeled label="Seu lance" hint={`Mínimo ${brl(state.minNextCents)}`}>
+              <input
+                className="input tabular-nums"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </Labeled>
             <div className="grid grid-cols-2 gap-2">
-              <input className="input" placeholder="Seu nome" value={donor.name} onChange={(e) => setDonor({ ...donor, name: e.target.value })} required />
-              <input className="input" type="email" placeholder="E-mail" value={donor.email} onChange={(e) => setDonor({ ...donor, email: e.target.value })} required />
+              <Labeled label="Nome" required>
+                <input
+                  className="input"
+                  autoComplete="name"
+                  value={donor.name}
+                  onChange={(e) => setDonor({ ...donor, name: e.target.value })}
+                  required
+                />
+              </Labeled>
+              <Labeled label="E-mail" required>
+                <input
+                  className="input"
+                  type="email"
+                  autoComplete="email"
+                  value={donor.email}
+                  onChange={(e) => setDonor({ ...donor, email: e.target.value })}
+                  required
+                />
+              </Labeled>
             </div>
-            <button type="submit" disabled={busy} className="rounded-full py-2 text-sm font-medium text-white disabled:opacity-50" style={{ background: accent }}>
+            <button
+              type="submit"
+              disabled={busy}
+              aria-busy={busy || undefined}
+              className="mt-1 inline-flex min-h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold disabled:opacity-50"
+              style={{ background: pal.accent, color: pal.onAccent }}
+            >
+              {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
               {busy ? "Enviando…" : "Dar lance"}
             </button>
           </form>
         )}
-        {msg && <p className={"mt-2 text-xs " + (msg.startsWith("Lance registrado") ? "text-success" : "text-danger")}>{msg}</p>}
+        {msg && (
+          <p
+            className={"mt-2 text-xs " + (msg.tone === "ok" ? "text-success" : "text-danger")}
+            role="status"
+            aria-live="polite"
+          >
+            {msg.text}
+          </p>
+        )}
       </div>
     </div>
   );

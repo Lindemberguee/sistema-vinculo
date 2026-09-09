@@ -72,8 +72,8 @@ export default async function OrgDirectory({
 
   return (
     <div className="min-h-screen bg-canvas">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-4">
+      <header className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-5 py-3 sm:px-6">
           {branding.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={branding.logoUrl} alt={org.displayName} className="h-8 w-auto object-contain" />
@@ -85,29 +85,36 @@ export default async function OrgDirectory({
               {org.displayName.trim().charAt(0).toUpperCase()}
             </span>
           )}
-          <span className="text-base font-semibold">{org.displayName}</span>
+          <span className="truncate text-base font-semibold">{org.displayName}</span>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight">Campanhas</h1>
-        <p className="mt-1 text-sm text-muted">Escolha uma causa para apoiar.</p>
+      <main className="mx-auto max-w-5xl px-5 py-10 sm:px-6 sm:py-14">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Campanhas</h1>
+        <p className="mt-1.5 text-sm text-muted">Escolha uma causa para apoiar.</p>
 
         {usedCategories.length > 0 && (
-          <nav className="mt-5 flex flex-wrap gap-2">
-            <FilterChip href="/" label="Todas" active={!cat} />
+          <nav className="mt-6 flex flex-wrap gap-2">
+            <FilterChip href="/" label="Todas" active={!cat} accent={accent} />
             {usedCategories.map((c) => (
-              <FilterChip key={c.value} href={`/?categoria=${c.value}`} label={c.label} active={cat === c.value} />
+              <FilterChip
+                key={c.value}
+                href={`/?categoria=${c.value}`}
+                label={c.label}
+                active={cat === c.value}
+                accent={accent}
+              />
             ))}
           </nav>
         )}
 
         {campaigns.length === 0 ? (
-          <p className="mt-10 rounded-xl border border-dashed border-line-strong px-6 py-12 text-center text-sm text-muted">
-            Nenhuma campanha publicada no momento.
-          </p>
+          <div className="mt-12 rounded-2xl border border-dashed border-line-strong px-6 py-16 text-center">
+            <p className="text-sm font-medium text-ink">Nenhuma campanha publicada no momento</p>
+            <p className="mt-1 text-sm text-muted">Volte em breve para acompanhar as novidades.</p>
+          </div>
         ) : (
-          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {campaigns.map((c) => {
               const raised = c.raisedCents + c.offPlatformCents;
               const pct = c.goalCents ? Math.min(100, Math.round((raised / c.goalCents) * 100)) : null;
@@ -115,12 +122,16 @@ export default async function OrgDirectory({
                 <Link
                   key={c.slug}
                   href={`/${c.slug}`}
-                  className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface no-underline transition-shadow hover:shadow-card"
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-surface no-underline shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-pop"
                 >
-                  <div className="aspect-[16/9] w-full bg-canvas">
+                  <div className="aspect-[16/9] w-full overflow-hidden bg-canvas">
                     {c.coverImageUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.coverImageUrl} alt={c.title} className="size-full object-cover" />
+                      <img
+                        src={c.coverImageUrl}
+                        alt={c.title}
+                        className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                      />
                     )}
                   </div>
                   <div className="flex flex-1 flex-col p-4">
@@ -133,7 +144,7 @@ export default async function OrgDirectory({
                     {c.slogan && <p className="mt-0.5 line-clamp-2 text-sm text-muted">{c.slogan}</p>}
                     <div className="mt-3 flex-1" />
                     {pct !== null && (
-                      <div className="mb-1.5 h-1.5 overflow-hidden rounded-full bg-canvas">
+                      <div className="mb-1.5 h-2 overflow-hidden rounded-full bg-canvas">
                         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
                       </div>
                     )}
@@ -149,20 +160,32 @@ export default async function OrgDirectory({
         )}
       </main>
 
-      <footer className="border-t border-line py-6 text-center text-xs text-faint">
+      <footer className="border-t border-line bg-surface py-5 text-center text-xs text-faint">
         Feito com a plataforma de doações.
       </footer>
     </div>
   );
 }
 
-function FilterChip({ href, label, active }: { href: string; label: string; active: boolean }) {
+function FilterChip({
+  href,
+  label,
+  active,
+  accent,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  accent: string;
+}) {
   return (
     <Link
       href={href}
-      className={
-        "rounded-full border px-3 py-1 text-xs font-medium no-underline transition-colors " +
-        (active ? "border-brand-600 bg-brand-600 text-white" : "border-line-strong text-muted hover:text-ink")
+      className="min-h-9 rounded-full border px-3.5 py-1.5 text-xs font-medium no-underline transition-colors"
+      style={
+        active
+          ? { borderColor: accent, background: accent, color: "white" }
+          : { borderColor: "var(--color-line-strong)", color: "var(--color-muted)" }
       }
     >
       {label}

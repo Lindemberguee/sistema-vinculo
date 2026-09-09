@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { tokenizeCard } from "./pagarme-browser";
 import { resolveAccent } from "./accent";
 import {
@@ -17,6 +17,8 @@ import {
   AwaitingPix,
   CardFields,
   BillingAddressFields,
+  CheckRow,
+  ToggleRow,
   emptyCard,
   useBillingAddress,
   useScrollToError,
@@ -753,85 +755,3 @@ export function DonationCheckout(props: DonationCheckoutProps) {
   );
 }
 
-// ── local rows ──────────────────────────────────────────────────
-
-function CheckRow({
-  checked,
-  onChange,
-  accent,
-  children,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  accent: string;
-  children: ReactNode;
-}) {
-  const pal = resolveAccent(accent);
-  return (
-    <label className="flex cursor-pointer items-center gap-2.5 text-sm">
-      <span
-        className="grid size-5 shrink-0 place-items-center rounded-[0.3rem] border transition-colors"
-        style={
-          checked
-            ? { background: pal.accent, borderColor: pal.accent, color: pal.onAccent }
-            : { borderColor: "var(--color-line-strong)" }
-        }
-      >
-        {checked && <Check className="size-3.5" aria-hidden />}
-      </span>
-      <input
-        type="checkbox"
-        className="sr-only"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span>{children}</span>
-    </label>
-  );
-}
-
-function ToggleRow({
-  checked,
-  onChange,
-  accent,
-  title,
-  desc,
-  className,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  accent: string;
-  title: string;
-  desc?: string;
-  className?: string;
-}) {
-  const pal = resolveAccent(accent);
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${className ?? ""}`}
-      style={
-        checked
-          ? { borderColor: pal.accent, background: pal.wash }
-          : { borderColor: "var(--color-line-strong)" }
-      }
-    >
-      <span
-        className="mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors"
-        style={{ background: checked ? pal.accent : "var(--color-line-strong)" }}
-      >
-        <span
-          className="size-4 rounded-full bg-white transition-transform"
-          style={{ transform: checked ? "translateX(1rem)" : "translateX(0)" }}
-        />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-medium text-ink">{title}</span>
-        {desc && <span className="mt-0.5 block text-xs text-muted">{desc}</span>}
-      </span>
-    </button>
-  );
-}
