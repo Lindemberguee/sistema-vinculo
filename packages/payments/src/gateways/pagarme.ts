@@ -279,26 +279,26 @@ export class PagarmeGateway implements PaymentGateway {
    * only thing guarding the endpoint then).
    */
   verifyWebhook(rawBody: string, headers: Headers): WebhookEvent {
-    if (this.config.webhookSecret !== "insecure-sandbox") {
+    // The `insecure-sandbox` escape hatch is honoured only outside production —
+    // a stray value in the DB must never disable auth on a live deployment.
+    const skipAuth = this.config.webhookSecret === "insecure-sandbox" && process.env.NODE_ENV !== "production";
+    if (!skipAuth) {
       const header = headers.get("authorization") ?? "";
       const encoded = /^Basic\s+([A-Za-z0-9+/=]+)$/i.exec(header.trim())?.[1] ?? "";
       const provided = encoded ? Buffer.from(encoded, "base64").toString("utf8") : "";
       const a = Buffer.from(provided);
       const b = Buffer.from(this.config.webhookSecret);
       if (a.length !== b.length || !timingSafeEqual(a, b)) {
-        const [providedUser = "", providedPassword = ""] = provided.split(/:(.*)/s);
-        const [expectedUser = "", expectedPassword = ""] = this.config.webhookSecret.split(/:(.*)/s);
+        // Never log anything derived from the expected secret — this line is
+        // attacker-triggerable (just send a wrong Authorization header).
+        const [providedUser = ""] = provided.split(/:(.*)/s);
         console.warn(
           "[pagarme] invalid webhook auth",
           JSON.stringify({
             hasAuthorization: Boolean(header),
             hasBasicAuthorization: Boolean(encoded),
             providedUser,
-            expectedUser,
-            providedLength: provided.length,
-            expectedLength: this.config.webhookSecret.length,
-            providedPasswordLength: providedPassword.length,
-            expectedPasswordLength: expectedPassword.length,
+            credentialsMatchExpectedFormat: provided.includes(":"),
           }),
         );
         throw new PaymentError("Invalid webhook auth");

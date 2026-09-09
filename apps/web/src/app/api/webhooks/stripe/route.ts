@@ -27,10 +27,15 @@ export async function POST(req: Request) {
 
   try {
     if (event.type === "checkout.session.completed") {
-      const session = event.data as { id?: string; payment_status?: string; metadata?: { donationId?: string } };
+      const session = event.data as {
+        id?: string;
+        payment_status?: string;
+        amount_total?: number;
+        metadata?: { donationId?: string };
+      };
       if (session.payment_status === "paid") {
         const donationId = session.metadata?.donationId;
-        await confirmIntlDonation({ donationId, sessionId: session.id });
+        await confirmIntlDonation({ donationId, sessionId: session.id, amountTotal: session.amount_total });
       }
     } else if (event.type === "checkout.session.expired" || event.type === "checkout.session.async_payment_failed") {
       const session = event.data as { id?: string };
@@ -50,13 +55,22 @@ export async function POST(req: Request) {
   }
 }
 
-async function confirmIntlDonation(params: { donationId?: string; sessionId?: string }) {
+async function confirmIntlDonation(params: { donationId?: string; sessionId?: string; amountTotal?: number }) {
   const where = params.donationId ? { id: params.donationId } : { gatewayOrderId: params.sessionId };
   const donation = await prisma.donation.findFirst({
     where: { ...where, status: { in: ["CREATED", "PENDING"] } },
     include: { donor: true, organization: true, campaign: true },
   });
   if (!donation) return;
+
+  // Defence in depth: the session is server-created, but never mark a donation
+  // paid for less than it was created for.
+  if (typeof params.amountTotal === "number" && params.amountTotal < donation.amountCents) {
+    console.error(
+      `[stripe] amount mismatch for donation ${donation.id}: session ${params.amountTotal} < expected ${donation.amountCents} — not confirming`,
+    );
+    return;
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.donation.update({ where: { id: donation.id }, data: { status: "PAID", paidAt: new Date() } });

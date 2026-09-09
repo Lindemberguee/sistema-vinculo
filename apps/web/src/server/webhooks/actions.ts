@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { isAppError, WEBHOOK_EVENTS } from "@donation/shared";
+import { assertSafeOutboundUrl, isAppError, UnsafeUrlError, WEBHOOK_EVENTS } from "@donation/shared";
 import { requireOrgAccess } from "@/server/auth-helpers";
 
 export interface WebhookResult {
@@ -24,6 +24,15 @@ export async function createOutboundWebhook(
     const { db } = await requireOrgAccess(organizationId, "ADMIN");
     const parsed = createSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+
+    // SSRF guard: the worker will POST to this URL from inside our network, so
+    // reject anything that resolves to a private/loopback address.
+    try {
+      await assertSafeOutboundUrl(parsed.data.url);
+    } catch (err) {
+      if (err instanceof UnsafeUrlError) return { ok: false, error: err.message };
+      throw err;
+    }
 
     const secret = `whsec_${randomBytes(24).toString("hex")}`;
     await db.outboundWebhook.create({

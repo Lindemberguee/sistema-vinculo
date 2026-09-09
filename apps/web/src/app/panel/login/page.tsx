@@ -6,13 +6,15 @@ import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button, Field, Input, PasswordInput } from "@/components/ui";
+import { safeInternalPath } from "@/lib/safe-redirect";
 
 function LoginForm() {
   const params = useSearchParams();
   // "/" is the panel home on the app.<domain> subdomain (the middleware rewrites
   // it to /panel). Do NOT use "/panel" here — the middleware would rewrite that
-  // to /panel/panel and 404.
-  const callbackUrl = params.get("callbackUrl") ?? "/";
+  // to /panel/panel and 404. `safeInternalPath` blocks open-redirect payloads
+  // since we navigate manually (signIn runs with redirect: false).
+  const callbackUrl = safeInternalPath(params.get("callbackUrl"), "/");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
