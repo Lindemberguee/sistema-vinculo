@@ -92,7 +92,7 @@ export default async function AdminOrgs() {
                     <Td>
                       <div className="font-medium">{o.displayName}</div>
                       <div className="text-xs text-muted">{o.slug} · {o.legalName}</div>
-                      <div className="mt-1 text-[0.68rem] text-faint">Criada em {dt.format(o.createdAt)}</div>
+                      <div className="mt-1 text-2xs text-faint">Criada em {dt.format(o.createdAt)}</div>
                     </Td>
                     <Td>
                       <div className="grid gap-1"><StatusBadge status={o.status} /><StatusBadge status={o.kycStatus} /></div>

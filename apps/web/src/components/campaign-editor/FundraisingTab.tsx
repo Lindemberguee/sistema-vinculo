@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveCampaignFundraising, type ActionResult } from "@/server/campaigns/actions";
-import { Field, Input, Select, Checkbox } from "@/components/ui";
+import { Field, Input, Select, Switch } from "@/components/ui";
 import { SectionCard, SaveBar } from "./EssentialTab";
 
 export interface FundraisingValues {
@@ -31,6 +31,8 @@ export function FundraisingTab({
     null,
   );
   const err = (k: string) => state?.fieldErrors?.[k]?.[0];
+  const [allowRecurring, setAllowRecurring] = useState(initial.allowRecurring);
+  const [allowTip, setAllowTip] = useState(initial.allowTip);
 
   return (
     <form action={action} className="space-y-5">
@@ -68,8 +70,22 @@ export function FundraisingTab({
             <Input name="suggestedAmountsCents" defaultValue={initial.suggestedAmountsReais} />
           </Field>
         </div>
-        <Checkbox name="allowRecurring" value="true" defaultChecked={initial.allowRecurring} label="Permitir doação mensal" />
-        <Checkbox name="allowTip" value="true" defaultChecked={initial.allowTip} label="Permitir contribuição extra à causa" />
+        <input type="hidden" name="allowRecurring" value={allowRecurring ? "true" : ""} />
+        <input type="hidden" name="allowTip" value={allowTip ? "true" : ""} />
+        <div className="grid gap-3 rounded-xl border border-line-strong p-3">
+          <Switch
+            checked={allowRecurring}
+            onCheckedChange={setAllowRecurring}
+            label="Permitir doação mensal"
+            description="O doador pode transformar a doação em recorrente."
+          />
+          <Switch
+            checked={allowTip}
+            onCheckedChange={setAllowTip}
+            label="Permitir contribuição extra à causa"
+            description="Mostra a opção de somar um valor para cobrir a taxa de processamento."
+          />
+        </div>
       </SectionCard>
 
       <SectionCard title="Doações fora da plataforma" desc="Valores recebidos por fora que devem contar no total da campanha.">

@@ -5,6 +5,7 @@ export { Field, Input, Textarea, Select, Checkbox } from "./Field";
 export { Switch } from "./Switch";
 export { FormSection, FormActions } from "./FormSection";
 export { PasswordInput } from "./PasswordInput";
+export { MoneyInput } from "./MoneyInput";
 export { Stepper } from "./Stepper";
 export { Badge, StatusBadge } from "./Badge";
 export { PageHeader, EmptyState, Skeleton, Stat, Alert, Sparkline, DeltaBadge } from "./Page";

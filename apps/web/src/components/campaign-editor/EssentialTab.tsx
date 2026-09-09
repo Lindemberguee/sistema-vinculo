@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { Check } from "lucide-react";
 import { saveCampaignEssentials, type ActionResult } from "@/server/campaigns/actions";
 import { Field, Input, Textarea, Select, Button } from "@/components/ui";
 import { StoryEditor } from "@/components/StoryEditor";
@@ -91,14 +92,26 @@ export function SectionCard({ title, desc, children }: { title: string; desc?: s
 }
 
 export function SaveBar({ state, pending }: { state: ActionResult | null; pending: boolean }) {
+  const [savedShown, setSavedShown] = useState(false);
+  useEffect(() => {
+    if (!state?.ok) return;
+    setSavedShown(true);
+    const t = setTimeout(() => setSavedShown(false), 4000);
+    return () => clearTimeout(t);
+  }, [state]);
+
   return (
-    <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+    <div
+      className="sticky bottom-3 z-10 mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface/95 px-3 py-2.5 shadow-card backdrop-blur"
+      style={{ marginBottom: "max(0px, env(safe-area-inset-bottom))" }}
+    >
       <Button type="submit" loading={pending}>
         {pending ? "Salvando…" : "Salvar alterações"}
       </Button>
-      {state?.ok && (
-        <span className="text-sm text-success" role="status" aria-live="polite">
-          Alterações salvas.
+      {savedShown && (
+        <span className="inline-flex items-center gap-1.5 text-sm text-success" role="status" aria-live="polite">
+          <Check className="size-4" aria-hidden />
+          Alterações salvas
         </span>
       )}
       {state?.error && (
