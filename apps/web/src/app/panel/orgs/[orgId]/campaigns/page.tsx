@@ -5,9 +5,9 @@ import { getCampaignsSummary } from "@/server/panel/summaries";
 import { orgPublicOrigin } from "@/server/links/url";
 import { RowMenu } from "@/components/RowMenu";
 import { CopyButton } from "@/components/public/CopyButton";
+import { NewCampaignButton } from "@/components/NewCampaignButton";
 import {
   PageHeader,
-  LinkButton,
   EmptyState,
   StatusBadge,
   Alert,
@@ -50,10 +50,7 @@ export default async function CampaignsList({ params }: { params: Promise<{ orgI
 
   return (
     <>
-      <PageHeader
-        title="Campanhas"
-        actions={<LinkButton href={`/orgs/${orgId}/campaigns/new`}>Nova campanha</LinkButton>}
-      />
+      <PageHeader title="Campanhas" actions={<NewCampaignButton orgId={orgId} />} />
 
       {org?.status !== "ACTIVE" && (
         <div className="mb-4">
@@ -67,7 +64,14 @@ export default async function CampaignsList({ params }: { params: Promise<{ orgI
       )}
 
       {campaigns.length === 0 ? (
-        <EmptyState>Nenhuma campanha ainda. Crie a primeira.</EmptyState>
+        <EmptyState
+          title="Nenhuma campanha ainda"
+          action={
+            <NewCampaignButton orgId={orgId}>Criar a primeira campanha</NewCampaignButton>
+          }
+        >
+          Crie uma campanha e configure a página no editor de blocos.
+        </EmptyState>
       ) : (
         <div className="space-y-4">
           <SummaryStrip
