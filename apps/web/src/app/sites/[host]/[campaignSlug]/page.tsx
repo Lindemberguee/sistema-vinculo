@@ -134,9 +134,35 @@ export default async function CampaignPage({
           allowAmbassadors: data.campaign.allowAmbassadors,
         });
 
+  // Two-column reading layout: the donation checkout lives in a sticky right
+  // rail on desktop, the narrative flows on the left. A leading hero still spans
+  // full width. Falls back to a single stacked column when there is no checkout
+  // block (e.g. a raffle-only page).
+  const checkoutBlock = blocks.find((b) => b.type === "donationCheckout");
+  const rest = blocks.filter((b) => b.type !== "donationCheckout");
+  const leadsWithHero = rest[0]?.type === "hero";
+  const heroBlock = leadsWithHero ? rest[0] : null;
+  const bodyBlocks = leadsWithHero ? rest.slice(1) : rest;
+
   return (
-    <main className="@container min-h-screen bg-surface">
-      <BlockList blocks={blocks} ctx={data.ctx} />
+    <main id="top" className="@container min-h-screen bg-surface">
+      {checkoutBlock ? (
+        <>
+          {heroBlock && <BlockList blocks={[heroBlock]} ctx={data.ctx} />}
+          <div className="mx-auto grid max-w-6xl gap-x-10 px-0 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-6">
+            <div className="min-w-0">
+              <BlockList blocks={bodyBlocks} ctx={data.ctx} />
+            </div>
+            <aside className="px-5 py-8 sm:px-6 lg:px-0 lg:py-10">
+              <div className="lg:sticky lg:top-6">
+                <BlockList blocks={[checkoutBlock]} ctx={data.ctx} />
+              </div>
+            </aside>
+          </div>
+        </>
+      ) : (
+        <BlockList blocks={blocks} ctx={data.ctx} />
+      )}
     </main>
   );
 }

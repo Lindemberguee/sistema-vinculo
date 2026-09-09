@@ -358,8 +358,14 @@ async function DonationCheckoutBlock({
     remaining: r.quantity == null ? null : Math.max(0, r.quantity - r.claimed),
   }));
 
+  const isPreview = ctx.host === "preview";
   return (
-    <div className="flex justify-center px-4 py-8">
+    <div className="mx-auto flex w-full max-w-[30rem] flex-col items-stretch px-4 py-6 lg:px-0 lg:py-0">
+      {isPreview && (
+        <p className="mb-2 rounded-md bg-info-bg px-3 py-1.5 text-xs text-info">
+          No site publicado, este bloco aparece numa coluna fixa ao lado do conteúdo (desktop).
+        </p>
+      )}
       <DonationCheckout
         campaignSlug={ctx.campaign.slug}
         minAmountCents={ctx.campaign.minAmountCents}
@@ -373,7 +379,7 @@ async function DonationCheckoutBlock({
         accentColor={accent}
         rewards={rewards.length ? rewards : undefined}
         dedicationEnabled={dedicationEnabled}
-        preview={ctx.host === "preview"}
+        preview={isPreview}
       />
     </div>
   );
