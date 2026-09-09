@@ -233,12 +233,14 @@ export function PanelChrome({
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <ThemeToggle />
-              <span
-                className="grid size-7 place-items-center rounded-full bg-brand-50 text-2xs font-semibold text-brand-700"
-                title={userName}
+              <Link
+                href="/account"
+                title={`Minha conta — ${userName}`}
+                aria-label="Minha conta"
+                className="grid size-7 place-items-center rounded-full bg-brand-50 text-2xs font-semibold text-brand-700 hover:bg-brand-100"
               >
                 {initials(userName)}
-              </span>
+              </Link>
             </div>
           </div>
         </header>

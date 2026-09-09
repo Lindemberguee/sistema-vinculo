@@ -254,24 +254,41 @@ export function PanelSidebar({
       </nav>
 
       {/* Footer */}
-      <div className={cn("shrink-0 border-t border-line", collapsed ? "flex justify-center py-3" : "px-3 py-3")}>
+      <div className={cn("shrink-0 border-t border-line", collapsed ? "flex flex-col items-center gap-1 py-3" : "px-3 py-3")}>
         {collapsed ? (
-          <Link
-            href="/api/auth/signout"
-            title={`Sair — ${userName}`}
-            aria-label="Sair"
-            className="grid size-9 place-items-center rounded-lg text-faint hover:bg-canvas hover:text-ink"
-          >
-            <LogOut className="size-4" />
-          </Link>
-        ) : (
-          <div className="flex items-center gap-2 px-1">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-canvas text-2xs font-semibold text-muted">
+          <>
+            <Link
+              href="/account"
+              title={`Minha conta — ${userName}`}
+              aria-label="Minha conta"
+              className="grid size-9 place-items-center rounded-full bg-canvas text-2xs font-semibold text-muted hover:text-ink"
+            >
               {initials(userName)}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-ui text-muted">{userName}</span>
+            </Link>
             <Link
               href="/api/auth/signout"
+              prefetch={false}
+              title="Sair"
+              aria-label="Sair"
+              className="grid size-9 place-items-center rounded-lg text-faint hover:bg-canvas hover:text-ink"
+            >
+              <LogOut className="size-4" />
+            </Link>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 px-1">
+            <Link
+              href="/account"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 pl-1 pr-2 hover:bg-canvas"
+            >
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-canvas text-2xs font-semibold text-muted">
+                {initials(userName)}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-ui text-muted">{userName}</span>
+            </Link>
+            <Link
+              href="/api/auth/signout"
+              prefetch={false}
               aria-label="Sair"
               className="grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-canvas hover:text-ink"
             >

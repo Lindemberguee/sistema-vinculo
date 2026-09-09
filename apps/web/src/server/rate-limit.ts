@@ -89,6 +89,7 @@ export const RL = {
   passwordResetIp: [5, 600],
   passwordResetTarget: [4, 3600],
   resendVerification: [3, 600],
+  changePassword: [5, 600],
   login: [10, 600],
   donation: [20, 60],
   publicLookup: [120, 60],

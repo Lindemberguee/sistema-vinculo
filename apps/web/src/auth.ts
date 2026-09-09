@@ -104,10 +104,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const uid = token.uid as string;
         const [memberships, row] = await Promise.all([
           loadMemberships(uid),
-          prisma.user.findUnique({ where: { id: uid }, select: { emailVerified: true } }),
+          prisma.user.findUnique({
+            where: { id: uid },
+            select: { emailVerified: true, name: true, email: true, image: true },
+          }),
         ]);
         token.memberships = memberships;
         token.verified = Boolean(row?.emailVerified);
+        // Keep the display identity fresh too, so "Minha conta" edits show up
+        // without a re-login.
+        if (row) {
+          token.name = row.name;
+          token.email = row.email;
+          token.picture = row.image;
+        }
         token.membershipsSyncedAt = Date.now();
       }
       return token;
@@ -116,6 +126,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = (token.uid as string) ?? "";
       session.user.verified = Boolean(token.verified);
       session.user.memberships = (token.memberships as SessionMembership[] | undefined) ?? [];
+      if (token.name !== undefined) session.user.name = token.name;
+      if (token.email) session.user.email = token.email;
+      if (token.picture !== undefined) session.user.image = token.picture as string | null | undefined;
       return session;
     },
   },
